@@ -2,11 +2,17 @@
 
 # Platinum-MD Next
 
-A Linux desktop application for recording music to NetMD MiniDisc recorders, based on [Platinum-MD by Gavin Benda](https://github.com/gavinbenda/platinum-md). The original project and bundled third-party tools retain their own authorship and licenses. This is an independent community fork, not an official Sony or upstream release.
+Record music to NetMD MiniDisc recorders from Linux. A modernized fork of [Platinum-MD by Gavin Benda](https://github.com/gavinbenda/platinum-md).
 
-## Download and install
+## Features
 
-**Version 1.1.0.** The main download is **Platinum-MD-Next-1.1.0-linux-amd64.deb**, for **Linux Mint 22 / Ubuntu 24.04 on Intel or AMD 64-bit computers**.
+- Record audio files (FLAC, MP3, WAV, AAC and more) or audio CDs in SP, LP2 or LP4
+- Drag and drop files into the recording queue; reorder and rename before recording
+- Look up CD album and track names on MusicBrainz, and name an empty disc after the album
+- Rename, move and delete tracks on the MiniDisc, and control playback on the recorder
+- Eight colour themes, each with light and dark modes
+
+## Install
 
 <!-- download-start -->
 
@@ -14,73 +20,34 @@ A Linux desktop application for recording music to NetMD MiniDisc recorders, bas
 
 <!-- download-end -->
 
-Close the old app, double-click the `.deb` and install it. Open **Platinum-MD Next** from your application menu, then reconnect the recorder once. There is no folder merging or separate converter installation.
+Double-click the `.deb` to install it, or run `sudo apt install ./Platinum-MD-Next-*-linux-amd64.deb`. Open **Platinum-MD Next** from the application menu and connect your recorder. If it was already plugged in, unplug and reconnect it once.
 
-If you prefer the terminal, open it in the download folder and run:
+**Requirements:** Linux Mint 22 or Ubuntu 24.04, 64-bit Intel/AMD. See the [installation guide](docs/INSTALL.md) for upgrading and removal.
 
-```bash
-sudo apt install ./Platinum-MD-Next-1.1.0-linux-amd64.deb
-```
+Tested with a Sony MZ-N910 on Linux Mint 22.3. Other NetMD recorders are untested; reports are welcome in [Issues](https://github.com/kirjolohi69/platinum-md-next/issues). Use **Diagnostics → Save report** when reporting a problem, and check the report for private file names first.
 
-Run the application as your normal user. The installer includes the desktop runtime, NetMD helper, audio converters, CD reader, device-specific USB rules, source and licenses. It upgrades earlier 2.0 alpha packages; the app now uses the requested 1.0 release numbering.
+## Good to know
 
-See the [installation guide](docs/INSTALL.md) for upgrades, removal and requirements. These binaries require glibc 2.39 or newer and normal desktop sandbox support. They are not universal Linux packages: older Ubuntu/Mint, Debian 12, ARM and Alpine are not supported by this download. Flatpak and other package formats are future work.
-
-## Features
-
-- Record audio files and audio CDs in SP, LP2 or LP4.
-- Look up CD album and track names through MusicBrainz, with saved results available offline.
-- Drag audio files onto the queue, edit titles and arrange the recording queue; optionally name an empty MiniDisc after the album.
-- Read disc information, rename tracks, manage tracks on ungrouped discs and control recorder playback.
-- Choose eight saved appearance palettes: orange, red, yellow, forest, blue, silver, burgundy and violet. Each supports light, dark and system brightness.
-- Request CD read speeds from 1× to 48× or Maximum. Error correction stays enabled; actual speed depends on the drive and disc.
-- View recording stages and export diagnostics with separate CD reading, encoding and MiniDisc transfer timings.
-
-Playback controls play through the recorder's audio output. When a recording finishes, keep power connected while the recorder saves disc information. On the MZ-N910, if the lid stays locked after disconnecting, press its physical **STOP** button and wait for **TOC Edit** to disappear before opening it.
-
-CD reading, encoding and transfer happen in sequence for each track. This release adds more precise reading diagnostics, without claiming faster extraction. Choose Maximum to request full drive speed.
-
-## Tested scope and limits
-
-The app has been used successfully on **Linux Mint 22.3 with a Sony MZ-N910**. The author has confirmed playback, reconnection, empty-recorder handling, local-file and CD recording, working album lookup, and LP2/LP4 listening. The latest hardware report contains five successful local-file transfers with clean commit, session close, release and readback. See [validation](docs/VALIDATION.md) and the [changelog](docs/CHANGELOG.md).
-
-The new `.deb` is checked by extraction, integrity verification, bundled-tool startup and isolated installer-script simulations. Electron startup could not be completed in the current build workspace and is not counted as passed. These are not a live installation or graphical launch on a second computer. Other distributions and recorder models remain unverified.
-
-Hi-MD, audio extraction from MiniDisc, group editing, Windows/macOS builds and automatic updates are not included. Recording, deletion, movement and disc renaming remain blocked on grouped discs to preserve their metadata. Recorder titles use basic Latin characters; accents are simplified. Pre-emphasis and four-channel CDs are not supported. LP2/LP4 use the open-source ATRAC encoder.
-
-Online lookup is optional. The main process contacts MusicBrainz over HTTPS with CD timing information, not audio files. The queue remains usable without an internet connection. Read [metadata behavior](docs/CD_METADATA.md).
+- After recording, keep the recorder powered while it saves the disc's track list. If the lid of an MZ-N910 stays locked, press its **STOP** button and wait for "TOC Edit" to disappear.
+- Discs with groups are read-only in this version, to protect their group information.
+- Track titles are limited to basic Latin characters; accents are simplified.
+- Not supported: Hi-MD, copying audio from a MiniDisc back to the computer, Windows and macOS.
+- Album lookup is optional. It sends only the CD's track timings to MusicBrainz, never your audio. See [CD metadata](docs/CD_METADATA.md).
 
 ## Build from source
 
-Use Ubuntu 24.04 x86_64 and Node.js 24. Install build prerequisites once:
+On Ubuntu 24.04 with Node.js 24:
 
 ```bash
-sudo apt-get update
 sudo apt-get install -y build-essential cmake pkg-config git python3 libusb-1.0-0-dev libgcrypt20-dev libjson-c-dev
-```
-
-From a clean, committed Git checkout, as a normal user:
-
-```bash
 npm ci
 npm test
-npm run native
-npm run test:native
-npm run test:audio
-npm run package:deb
-npm run test:deb
+npm run native        # build the bundled NetMD, audio and CD helpers
+npm run package:deb   # writes the installer to release/
 ```
 
-The `.deb` is written to `release/`. The first native build downloads and compiles pinned dependencies and can take a while. Keep `.cache/` for faster rebuilds. The packaging check requires committed source so the embedded Git backup matches the application. `npm run dev` opens the app after native tools are built.
-
-The desktop app lives in `app/` (Electron main process) and `ui/` (Vue interface). The original project's Electron-Vue code was removed after the rewrite; it remains available in [the upstream repository](https://github.com/gavinbenda/platinum-md). [The original README](docs/UPSTREAM_README.md) is kept for reference.
-
-The application uses a sandboxed, isolated renderer with a small preload bridge. USB and audio work run through bundled helpers. Native source pins, patches, licenses and build instructions are included in each package. This modernization is not a complete protocol rewrite or security audit.
-
-## Releases
-
-GitHub Actions builds and checks the `.deb` on every push. Maintainers publish releases by following the [release guide](docs/PUBLISHING.md). Changes between versions are listed in the [changelog](docs/CHANGELOG.md).
+`npm run dev` starts the app after `npm run native`. The app is in `app/` (Electron main process) and `ui/` (Vue interface). Release steps are in [docs/PUBLISHING.md](docs/PUBLISHING.md) and changes in the [changelog](docs/CHANGELOG.md).
 
 ## License and credits
 
-Application: MIT, preserving Gavin Benda's original copyright and artwork attribution. Native programs retain their component licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [LICENSE](LICENSE), and the matching native source and licenses included in binary packages.
+MIT, see [LICENSE](LICENSE). Based on Platinum-MD by Gavin Benda. Bundled tools (linux-minidisc, atracdenc, FFmpeg, cdparanoia) keep their own licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). This is an independent community project, not affiliated with Sony or the original author.
