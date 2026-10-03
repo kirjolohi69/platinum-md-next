@@ -41,6 +41,7 @@ Decisions already made (do not reopen without the owner asking):
 
 - Work on a branch, open a PR to `main`, merge once Actions is green. The owner has authorized merging. Releases are published by the owner (see `docs/PUBLISHING.md`); publishing builds the tag and attaches the `.deb`.
 - New version: bump `package.json` + `package-lock.json` (`npm version X --no-git-tag-version`), the fallback in `ui/App.vue`, `docs/INSTALL.md`; write `docs/RELEASE_X.md`, add it to the top of `docs/CHANGELOG.md`, and point `releaseNotes` in `package.json` at it. Keep `debianEpoch: 1`.
+- The README's user-facing parts (download, requirements, tested-with) describe the **latest published release**, never unreleased work. Prepare such changes, and apply them right after the owner publishes.
 - Claude's cloud environment cannot delete remote branches; ask the owner, or rely on the repo's auto-delete setting.
 - Public comments on GitHub are visible to everyone: be friendly, short, and end them with the Claude Code attribution footer.
 
@@ -56,4 +57,5 @@ Ask the owner first for: anything that changes recording, disc editing, USB acce
 - "Does my recorder work?" issue form and a compatibility table.
 - 1.3.0 (built on Ubuntu 22.04; .rpm; Arch PKGBUILD) awaits the owner's install-and-record test on Mint before release.
 - After each release: update `pkgver` and `sha256sums` in `packaging/arch/PKGBUILD` to the released `.deb`.
+- When 1.3.0 is published: restore the README download, requirements and tested-with lines from commit f5d831a (`.rpm`, Debian 12+, Ubuntu 22.04+, Mint 21+, Fedora, openSUSE, Arch).
 - Dependabot PRs #2–#7: four patch/minor updates; `actions/checkout` 7 and `actions/setup-node` 7 are majors.
