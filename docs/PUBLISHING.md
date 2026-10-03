@@ -21,7 +21,7 @@ Diagnostics reports can contain music titles and folder paths. Do not attach you
 1. Open **Releases → Draft a new release**.
 2. Under **Choose a tag**, type the version with a `v` in front, for example `v1.1.0`, and choose **Create new tag on publish**. Target: `main`.
 3. Title: `Platinum-MD Next 1.1.0`.
-4. Description: paste the contents of `docs/RELEASE_1_1_0.md`. It helps to add a line stating what it was tested with, e.g. *Tested on Linux Mint 22.3 with a Sony MZ-N910. Targets Linux Mint 22 / Ubuntu 24.04 on 64-bit Intel/AMD.*
+4. Description: paste the contents of the matching `docs/RELEASE_<version>.md` file (e.g. `docs/RELEASE_1_2_0.md`). It helps to add a line stating what it was tested with, e.g. *Tested on Linux Mint 22.3 with a Sony MZ-N910. Targets Linux Mint 22 / Ubuntu 24.04 on 64-bit Intel/AMD.*
 5. Click **Publish release**.
 
 Publishing starts a build of that exact tag. When it finishes (usually under an hour) the workflow attaches these to the release automatically:

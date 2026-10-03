@@ -87,5 +87,5 @@ jobs:
             exit 1
           fi
           cd release && sha256sum --check --ignore-missing SHA256SUMS
-          sha256sum ./*.deb ./*.tar.gz | sed 's# \./# #' > SHA256SUMS
-          gh release upload "$TAG" ./*.deb ./*.tar.gz SHA256SUMS --clobber
+          sha256sum ./*.deb ./Platinum-MD-Next-source.tar.gz | sed 's# \./# #' > SHA256SUMS
+          gh release upload "$TAG" ./*.deb ./Platinum-MD-Next-source.tar.gz SHA256SUMS --clobber
