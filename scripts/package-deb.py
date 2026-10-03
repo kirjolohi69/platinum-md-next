@@ -138,7 +138,7 @@ Categories=AudioVideo;Audio;
     # dpkg records root ownership without requiring this build process to be root.
     partial = output.with_suffix('.deb.partial')
     try:
-        subprocess.run(['dpkg-deb', '--root-owner-group', '--threads-max=2', '-Zxz', '-z6',
+        subprocess.run(['dpkg-deb', '--root-owner-group', '-Zxz', '-z6',
                         '--build', str(stage), str(partial)], check=True)
         partial.replace(output)
     finally:
