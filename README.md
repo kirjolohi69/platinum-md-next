@@ -6,6 +6,8 @@
 
 Record music to NetMD MiniDisc recorders from Linux. A modernized fork of [Platinum-MD by Gavin Benda](https://github.com/gavinbenda/platinum-md).
 
+![Platinum-MD Next recording a CD album into a new group on a Sony MZ-N910](docs/screenshot.png)
+
 ## Features
 
 - Record audio files (FLAC, MP3, WAV, AAC and more) or audio CDs in SP, LP2 or LP4

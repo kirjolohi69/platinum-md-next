@@ -55,5 +55,4 @@ Ask the owner first for: anything that changes recording, disc editing, USB acce
 - Groups: rename/delete/move on grouped discs is hardware-tested. Creating, renaming and removing groups (disc panel **Group**, group-heading **Rename**/**Ungroup**, and `groupName` when recording) was added for 1.2.0; recording into a new group passed the owner's hardware test. Not yet tried on hardware: grouping a disc with no title (writes `0;//1-3;Name//`, as libnetmd does).
 - "Does my recorder work?" issue form and a compatibility table.
 - `.rpm` and AUR packaging.
-- README screenshot: the owner will upload `docs/screenshot.png`, then add it under the title.
 - Dependabot PRs #2–#7: four patch/minor updates; `actions/checkout` 7 and `actions/setup-node` 7 are majors.
