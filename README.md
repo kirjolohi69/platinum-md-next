@@ -10,7 +10,7 @@ Record music to NetMD MiniDisc recorders from Linux. A modernized fork of [Plati
 - Drag and drop files into the recording queue; reorder and rename before recording
 - Look up CD album and track names on MusicBrainz, and name an empty disc after the album
 - Rename, move and delete tracks on the MiniDisc, and control playback on the recorder
-- Eight colour themes, each with light and dark modes
+- Eight colour themes (more can be added), each with light and dark modes
 
 ## Install
 
@@ -28,10 +28,10 @@ Tested with a Sony MZ-N910 on Linux Mint 22.3. Other NetMD recorders are unteste
 
 ## Good to know
 
-- After recording, keep the recorder powered while it saves the disc's track list. If the lid of an MZ-N910 stays locked, press its **STOP** button and wait for "TOC Edit" to disappear.
+- After recording, keep the recorder powered while it saves the disc's track list. If the lid of an MZ-N910 (or similar recorder's lid) stays locked, press its **STOP** button and wait for "TOC Edit" to disappear.
 - Discs with groups are read-only in this version, to protect their group information.
 - Track titles are limited to basic Latin characters; accents are simplified.
-- Not supported: Hi-MD, copying audio from a MiniDisc back to the computer, Windows and macOS.
+- Not supported: Hi-MD (maybe in the future), copying audio from a MiniDisc back to the computer, Windows and macOS.
 - Album lookup is optional. It sends only the CD's track timings to MusicBrainz, never your audio. See [CD metadata](docs/CD_METADATA.md).
 
 ## Build from source
