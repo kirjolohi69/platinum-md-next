@@ -14,12 +14,13 @@ cc -O2 -g -UNDEBUG "${usb_flags[@]}" -I"$source_dir/libnetmd" \
 "$test_dir/capacity-test"
 read -r -a crypto_flags <<< "$("$pkg_config" --cflags libgcrypt)"
 read -r -a crypto_libs <<< "$("$pkg_config" --libs libgcrypt)"
-for suite in transport secure disc-header move recording closing media-presence; do
+for suite in transport secure disc-header move title recording closing media-presence; do
   case "$suite" in
     transport) implementation=(common) ;;
     secure) implementation=(secure) ;;
     disc-header) implementation=(libnetmd) ;;
     move) implementation=(libnetmd) ;;
+    title) implementation=(libnetmd) ;;
     recording) implementation=(send) ;;
     closing) implementation=(common secure) ;;
     media-presence) implementation=(playercontrol) ;;
