@@ -207,6 +207,7 @@ button.primary:hover:not(:disabled){background:var(--primary-hover);color:var(--
 .disc-tools>div{display:flex;gap:6px}
 .disc-tools span{font-size:11px;color:var(--muted)}
 .danger{color:var(--danger)}
+.disc-summary .disc-full{color:var(--danger);font-weight:700}
 .playback{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding:16px 18px;background:var(--subtle)}
 .playback>span{font-size:11px;color:var(--muted)}
 .playback>div{display:flex;gap:5px}
