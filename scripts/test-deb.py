@@ -42,6 +42,14 @@ if name == 'unshare': sys.exit(int(os.environ['HOOK_NO_USERNS']))
 elif name == 'ischroot': sys.exit(1)
 elif name == 'apparmor_parser':
     sys.exit(1 if '--skip-kernel-load' in args and os.environ['HOOK_NO_AA']=='1' else 0)
+elif name == 'chmod' and args[0] == '-R':
+    assert args[1] == 'a+rX', args
+    top = safe(args[2])
+    for path in [top, *top.rglob('*')]:
+        if path.is_symlink(): continue
+        mode = path.stat().st_mode
+        extra = 0o444 | (0o111 if path.is_dir() or mode & 0o111 else 0)
+        path.chmod((mode | extra) & 0o7777)
 elif name == 'chmod': safe(args[1]).chmod(int(args[0], 8))
 elif name in ['cp', 'install']:
     src, dest = safe(args[-2]), safe(args[-1]); dest.parent.mkdir(parents=True, exist_ok=True)
@@ -72,6 +80,9 @@ elif name not in ['update-alternatives','update-mime-database','update-desktop-d
         shutil.copyfile(app / 'resources/apparmor-profile', install / 'resources/apparmor-profile')
         shutil.copyfile(app / 'resources/linux/70-platinum-md-netmd.rules', install / 'resources/linux/70-platinum-md-netmd.rules')
         (install / 'chrome-sandbox').touch()
+        # An upgrade over an old build leaves its owner-only folders in place.
+        (install / 'resources').chmod(0o700)
+        install.chmod(0o700)
         (fake / 'usr/bin').mkdir(parents=True)
         (fake / 'usr/bin/ischroot').symlink_to(bins / 'ischroot')
         # Model the namespace link inside the isolated test, rather than
@@ -93,6 +104,8 @@ elif name not in ['update-alternatives','update-mime-database','update-desktop-d
                    HOOK_NO_USERNS=no_userns, HOOK_NO_AA=no_aa)
         # Repeat configuration to exercise package upgrades/reconfiguration.
         for _ in range(2): run('/bin/bash', hooks['postinst'], 'configure', env=env)
+        for folder in [install, install / 'resources', install / 'resources/linux']:
+            assert folder.stat().st_mode & 0o555 == 0o555, (case, folder, oct(folder.stat().st_mode))
         actual_mode = (install / 'chrome-sandbox').stat().st_mode & 0o7777
         assert actual_mode == (0o4755 if no_userns == '1' else 0o755), (case, oct(actual_mode), log.read_text())
         rules = fake / 'usr/lib/udev/rules.d/70-platinum-md-next.rules'
