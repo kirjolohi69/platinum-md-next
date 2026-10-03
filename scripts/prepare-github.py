@@ -17,7 +17,9 @@ text = readme.read_text()
 start, end = '<!-- download-start -->', '<!-- download-end -->'
 if not text.count(start) == text.count(end) == 1:
     parser.error('README download markers are missing; nothing was changed.')
-text = text[:text.index(start) + len(start)] + f'\n\n[Download the .deb installer]({url}/releases/latest).\n\n' + text[text.index(end):]
+text = text[:text.index(start) + len(start)] + (f'\n\n[Download the installer]({url}/releases/latest): `.deb` for Debian, Ubuntu and Mint, '
+                     '`.rpm` for Fedora and openSUSE. Arch Linux users can build a package with '
+                     '[`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD).\n\n') + text[text.index(end):]
 file = root / 'package.json'
 metadata = json.loads(file.read_text())
 metadata.update(homepage=url, repository={'type': 'git', 'url': f'git+{url}.git'},

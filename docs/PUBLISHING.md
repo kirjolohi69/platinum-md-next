@@ -2,7 +2,7 @@
 
 The source lives at [github.com/kirjolohi69/platinum-md-next](https://github.com/kirjolohi69/platinum-md-next). Everything below happens in the GitHub website; no terminal is needed.
 
-GitHub Actions (the **Linux Debian build** workflow) builds and checks the app on every push: application tests, native helper build and tests, `.deb` packaging, installation and a sandboxed desktop start. No MiniDisc recorder is attached to GitHub's computers, so recording itself is only tested on your own setup.
+GitHub Actions (the **Linux build** workflow) builds and checks the app on every push: application tests, native helper build and tests, `.deb` and `.rpm` packaging, installation and a sandboxed desktop start on Ubuntu 22.04, and installation checks on Debian, Ubuntu, Fedora, openSUSE and Arch Linux. No MiniDisc recorder is attached to GitHub's computers, so recording itself is only tested on your own setup.
 
 ## Before a release
 
@@ -21,16 +21,21 @@ Diagnostics reports can contain music titles and folder paths. Do not attach you
 1. Open **Releases → Draft a new release**.
 2. Under **Choose a tag**, type the version with a `v` in front, for example `v1.1.0`, and choose **Create new tag on publish**. Target: `main`.
 3. Title: `Platinum-MD Next 1.1.0`.
-4. Description: paste the contents of the matching `docs/RELEASE_<version>.md` file (e.g. `docs/RELEASE_1_2_0.md`). It helps to add a line stating what it was tested with, e.g. *Tested on Linux Mint 22.3 with a Sony MZ-N910. Targets Linux Mint 22 / Ubuntu 24.04 on 64-bit Intel/AMD.*
+4. Description: paste the contents of the matching `docs/RELEASE_<version>.md` file (e.g. `docs/RELEASE_1_2_0.md`). It helps to add a line stating what it was tested with, e.g. *Tested on Linux Mint 22.3 with a Sony MZ-N910. Targets Debian 12+, Ubuntu 22.04+, Mint 21+, Fedora, openSUSE and Arch on 64-bit Intel/AMD.*
 5. Click **Publish release**.
 
 Publishing starts a build of that exact tag. When it finishes (usually under an hour) the workflow attaches these to the release automatically:
 
 | File | Purpose |
 | --- | --- |
-| `Platinum-MD-Next-<version>-linux-amd64.deb` | The installer people download |
+| `Platinum-MD-Next-<version>-linux-amd64.deb` | Installer for Debian, Ubuntu, Mint and similar |
+| `Platinum-MD-Next-<version>-linux-x86_64.rpm` | Installer for Fedora and openSUSE |
 | `Platinum-MD-Next-source.tar.gz` | Source of this exact build |
 | `SHA256SUMS` | Checksums of the attached files |
+
+Before attaching anything, the workflow installs both packages on Debian, Ubuntu, Fedora, openSUSE and Arch Linux; if any of those checks fails, nothing is attached.
+
+**After publishing:** ask the coding assistant to update the Arch Linux recipe (`packaging/arch/PKGBUILD`) to the new version. It needs the checksum of the released `.deb`, which only exists once the release is built.
 
 The **Source code (zip / tar.gz)** links GitHub adds by itself are for developers and do not install anything. The README's download link always opens the newest release.
 

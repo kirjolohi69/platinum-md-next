@@ -4,7 +4,7 @@ import { palettes, defaultAppearance, readAppearance, saveAppearance, applyAppea
 import { cdReadSpeeds, readCdReadSpeed, saveCdReadSpeed } from './cd-settings.mjs';
 
 const api = window.netmd;
-const version = ref('1.2.0');
+const version = ref('1.3.0');
 const appearance = ref(readAppearance()), appearanceDialog = ref(null), appearanceSaved = ref(true);
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
 const refreshAppearance = () => applyAppearance(appearance.value, document.documentElement, systemTheme.matches);

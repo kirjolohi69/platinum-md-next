@@ -1,6 +1,6 @@
 {
   "name": "platinum-md-next",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "A modern Linux desktop for NetMD MiniDisc recorders",
   "author": "Platinum-MD Next contributors",
@@ -15,7 +15,7 @@
     "test": "node --test test/modern/*.test.cjs",
     "probe": "node scripts/probe.cjs",
     "native": "bash scripts/build-native.sh",
-    "package:linux": "npm run package:deb",
+    "package:linux": "npm run package:deb && npm run package:rpm",
     "package:portable": "npm run package:dir && python3 scripts/package-portable.py",
     "test:portable": "python3 scripts/test-portable.py",
     "package:dir": "npm run build && node scripts/check-native.cjs && electron-builder --linux dir --publish never",
@@ -24,7 +24,9 @@
     "test:audio": "python3 scripts/test-audio.py",
     "package:deb": "npm run package:dir && python3 scripts/package-deb.py",
     "test:native": "bash scripts/test-native.sh",
-    "test:deb": "python3 scripts/test-deb.py"
+    "test:deb": "python3 scripts/test-deb.py",
+    "package:rpm": "python3 scripts/package-rpm.py",
+    "test:distro": "bash scripts/test-distro.sh"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "6.0.8",
@@ -38,7 +40,7 @@
   "desktopName": "platinum-md-next.desktop",
   "musicbrainzContact": "https://github.com/kirjolohi69/platinum-md-next",
   "debianEpoch": 1,
-  "releaseNotes": "docs/RELEASE_1_2_0.md",
+  "releaseNotes": "docs/RELEASE_1_3_0.md",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kirjolohi69/platinum-md-next.git"

@@ -1,4 +1,4 @@
-name: Linux Debian build
+name: Linux build
 
 on:
   push:
@@ -18,7 +18,9 @@ concurrency:
 
 jobs:
   linux:
-    runs-on: ubuntu-24.04
+    # Built on the oldest supported system so the bundled helpers also run on
+    # Debian 12, Ubuntu 22.04 / Mint 21 and newer distributions.
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -32,7 +34,7 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake pkg-config git python3 libusb-1.0-0-dev libgcrypt20-dev libjson-c-dev xvfb
+          sudo apt-get install -y build-essential cmake pkg-config git python3 libusb-1.0-0-dev libgcrypt20-dev libjson-c-dev xvfb rpm
       - run: npm ci
       - run: npm test
       - run: npm run native
@@ -58,15 +60,47 @@ jobs:
           name: linux-amd64
           path: |
             release/*.deb
+            release/*.rpm
             release/*.tar.gz
             release/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
 
-  # Publishing a release on GitHub builds that tag and attaches the installer.
+  # Install the packages on other distributions and check every library is found.
+  distro:
+    needs: linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - mirror.gcr.io/library/debian:12
+          - mirror.gcr.io/library/debian:13
+          - mirror.gcr.io/library/ubuntu:22.04
+          - mirror.gcr.io/library/ubuntu:24.04
+          - mirror.gcr.io/library/fedora:42
+          - mirror.gcr.io/opensuse/tumbleweed:latest
+          - mirror.gcr.io/opensuse/leap:15.6
+          - mirror.gcr.io/library/archlinux:latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Download packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh run download "$GITHUB_RUN_ID" --name linux-amd64 --dir release
+      - run: bash scripts/test-distro.sh '${{ matrix.image }}'
+
+  # Publishing a release on GitHub builds that tag and attaches the installers.
   attach-release:
     if: github.event_name == 'release'
-    needs: linux
+    needs: [linux, distro]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -87,5 +121,5 @@ jobs:
             exit 1
           fi
           cd release && sha256sum --check --ignore-missing SHA256SUMS
-          sha256sum ./*.deb ./Platinum-MD-Next-source.tar.gz | sed 's# \./# #' > SHA256SUMS
-          gh release upload "$TAG" ./*.deb ./Platinum-MD-Next-source.tar.gz SHA256SUMS --clobber
+          sha256sum ./*.deb ./*.rpm ./Platinum-MD-Next-source.tar.gz | sed 's# \./# #' > SHA256SUMS
+          gh release upload "$TAG" ./*.deb ./*.rpm ./Platinum-MD-Next-source.tar.gz SHA256SUMS --clobber
