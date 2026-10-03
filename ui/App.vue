@@ -14,9 +14,10 @@ const disc = ref(null), devices = ref([]), files = ref([]), selected = ref([]), 
 const mode = ref('SP'), busy = ref(false), recording = ref(false), stopping = ref(false);
 const cdReadSpeed = ref(readCdReadSpeed()), cdSpeedSaved = ref(true);
 watch(cdReadSpeed, value => { cdSpeedSaved.value = saveCdReadSpeed(value); });
-const recordingStage = ref(null), stageElapsed = ref(0);
+const recordingStage = ref(null), stageElapsed = ref(0), preparingNext = ref(null);
 let stageClock;
-watch(recordingStage, stage => {
+// Restart the clock only when a new step begins, not on every status update.
+watch(() => recordingStage.value?.key ?? recordingStage.value?.name, stage => {
   clearInterval(stageClock);
   stageElapsed.value = 0;
   if (stage) {
@@ -203,6 +204,7 @@ onMounted(async () => {
       busy.value = Boolean(value.busy);
       recording.value = Boolean(value.recording);
       recordingStage.value = value.stage || null;
+      preparingNext.value = value.next || null;
       if (value.clearConnectionError) connectionError.value = '';
       if (value.error) {
         if (value.errorScope === 'connection') connectionError.value = value.message;
@@ -230,6 +232,7 @@ onUnmounted(() => { unsubscribe?.(); clearInterval(stageClock); systemTheme.remo
       <span class="connection-dot" :class="{ pulse: busy }"></span>
       <div class="connection-message"><strong>{{ disc?.device || devices[0]?.model || 'Waiting for a recorder' }}</strong><p>{{ message }}</p>
         <p v-if="recordingStage" class="stage-timings" aria-live="off"><span>{{ time(stageElapsed) }} elapsed in this step</span><span v-for="timing in recordingStage.timings.filter(t => !['check-disc', 'verify'].includes(t.name))" :key="timing.name">{{ timing.label }}: {{ time(timing.elapsedMs / 1000) }}</span></p>
+        <p v-if="recordingStage && preparingNext" class="stage-timings" aria-live="off"><span>Meanwhile: {{ preparingNext.label }} · {{ preparingNext.track }}: {{ preparingNext.title }}</span></p>
       </div>
       <button :disabled="busy || !api" @click="perform(() => api.connect(), true)">{{ disc || mediaState === 'no-disc' ? 'Refresh disc' : 'Connect / Retry' }}</button>
     </section>

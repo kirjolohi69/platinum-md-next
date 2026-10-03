@@ -6,6 +6,8 @@ const path = require('node:path');
 const os = require('node:os');
 const { NetMdService } = require('../../app/service.cjs');
 
+const recorderCalls = state => state.calls.filter(c => c[0] === 'netmdcli');
+
 async function fixture(t, exitCode, audioCd, cdMetadata) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'netmd-recording-test-'));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
@@ -25,7 +27,7 @@ async function fixture(t, exitCode, audioCd, cdMetadata) {
     enumerate: async () => [{ id: '054c:00c7', writable: true, key: state.key }],
     run: async (name, args) => {
       state.calls.push([name, ...args]);
-      state.toolStages.push({ name, args, stage: state.statuses.at(-1)?.stage?.name });
+      state.toolStages.push({ name, args, stage: state.statuses.at(-1)?.stage?.name, next: state.statuses.at(-1)?.next?.label });
       if (name === 'ffprobe') return { stdout: JSON.stringify({ format: { duration: '30',
         tags: { TITLE: 'Beyoncé — Live', ARTIST: 'Performer', ALBUM: 'Album', ALBUM_ARTIST: 'Album artist' } },
         streams: [{ codec_type: 'audio' }] }), exitCode: 0 };
@@ -197,10 +199,11 @@ test('automatic album naming refuses a populated MiniDisc before writing', async
 test('failed recording stops the queue and requires a USB reconnect before another attempt', async t => {
   const { service, state, request } = await fixture(t, 1);
   await assert.rejects(service.upload(request(), async () => true), /communication.*failed/);
-  assert.equal(state.sends, 1); assert.equal(state.converts, 1);
+  // The second file was converted while the first was being sent; it is never sent.
+  assert.equal(state.sends, 1); assert.equal(state.converts, 2);
   assert.deepEqual(state.uploaded, []); assert.equal(service.files.size, 2);
   assert.equal(service.disc, null); assert.equal(service.gate.busy, false);
-  assert.equal(state.calls.at(-1)[2], 'send'); // No follow-up read or command on an uncertain session.
+  assert.equal(recorderCalls(state).at(-1)[2], 'send'); // No follow-up read or command on an uncertain session.
   const calls = state.calls.length;
   await assert.rejects(service.connect(), /Disconnect USB/);
   assert.equal(state.calls.length, calls); // Refresh must not contact the broken USB session.
@@ -229,31 +232,39 @@ test('CD tracks enter in disc order and record once each through the existing qu
 test('LP batches apply the chosen CD speed to every track and report the actual active stage', async t => {
   for (const mode of ['LP2', 'LP4']) {
     const reads = [];
-    let currentState;
     const audioCd = { scan: async () => ({ device: '/dev/sr0', revision: 'cd-one', tracks:
       [1, 2].map(number => ({ number, title: `Track ${number}`, duration: 30 })) }),
       readTrack: async (source, _output, speed, onTiming) => {
-        reads.push([source.number, speed, currentState.statuses.at(-1).stage.name]);
+        reads.push([source.number, speed]);
         onTiming({ step: 'extract', elapsedMs: 1200 + source.number, success: true });
       } };
     const { service, state, request } = await fixture(t, 0, audioCd);
-    currentState = state;
     service.files.clear();
     await service.addCd({ device: '/dev/sr0', revision: 'cd-one', tracks: [1, 2] });
     await service.upload({ ...request(), mode, cdReadSpeed: '16' }, async () => true);
-    assert.deepEqual(reads, [[1, '16', 'cd-read'], [2, '16', 'cd-read']]);
+    assert.deepEqual(reads, [[1, '16'], [2, '16']]);
     assert.equal(state.sends, 2); assert.equal(state.converts, 0);
     assert.equal(service.files.size, 0);
     const stages = ['cd-read', 'encode', 'check-disc', 'transfer', 'verify'];
     const statuses = state.statuses.filter(s => s.stage);
-    assert.deepEqual(statuses.map(s => s.stage.name), [...stages, ...stages]);
-    for (const [i, status] of statuses.entries()) {
+    for (const status of statuses) {
       assert.equal(status.busy, true); assert.equal(status.recording, true);
-      assert.deepEqual(status.stage.timings.map(s => s.name), stages.slice(0, i % stages.length));
-      if (status.stage.name === 'encode') assert.match(status.message, new RegExp(`^Encoding ${mode}`));
+      const [track, name] = status.stage.key.split(':');
+      assert.equal(status.stage.name, name);
+      assert.match(status.message, new RegExp(`^${status.stage.label} · ${Number(track) + 1} of 2`));
+      // Each track's finished steps are listed in order, without the other track's.
+      assert.deepEqual(status.stage.timings.map(s => s.name), stages.slice(0, stages.indexOf(name)));
+      if (name === 'encode') assert.match(status.message, new RegExp(`^Encoding ${mode}`));
     }
+    for (const track of ['0', '1']) {
+      const seen = statuses.filter(s => s.stage.key.startsWith(`${track}:`)).map(s => s.stage.name);
+      assert.deepEqual([...new Set(seen)].filter(n => n !== 'cd-read' && n !== 'encode' || track === '0'),
+        track === '0' ? stages : stages.slice(2));
+    }
+    // The second track was read and encoded in the background while the first was handled.
+    assert.ok(statuses.some(s => s.stage.key.startsWith('0:') && s.next?.track === 2));
     for (const call of state.toolStages.filter(c => c.name === 'atracdenc')) {
-      assert.equal(call.stage, 'encode');
+      assert.ok(call.stage === 'encode' || call.next === `Encoding ${mode}`);
       assert.equal(call.args.at(-1), mode === 'LP2' ? '128' : '64');
     }
     assert.ok(state.toolStages.filter(c => c.args[1] === 'send').every(c => c.stage === 'transfer'));
@@ -273,6 +284,93 @@ test('LP batches apply the chosen CD speed to every track and report the actual 
   }
 });
 
+function slowCd(state, failNumber) {
+  const reads = [];
+  const audioCd = { scan: async () => ({ device: '/dev/sr0', revision: 'cd-one', tracks:
+    [1, 2, 3].map(number => ({ number, title: `Track ${number}`, duration: 30 })) }),
+    readTrack: (source, _output, _speed, _onTiming, signal) => new Promise((resolve, reject) => {
+      const read = { number: source.number, sendsAtStart: state().sends, signal };
+      reads.push(read);
+      // Reading takes until the previous track has been sent (or is cancelled).
+      const done = () => { read.finished = true; source.number === failNumber ? reject(new Error('Scratched CD')) : resolve(); };
+      const wait = () => {
+        if (signal?.aborted) { read.cancelled = true; return reject(new Error('Operation cancelled.')); }
+        if (state().sends >= source.number - 1 || state().failed) return done();
+        setTimeout(wait, 1);
+      };
+      wait();
+    }) };
+  return { reads, audioCd };
+}
+
+test('the next CD track is read while the current one is sent, never sent before its turn', async t => {
+  let current;
+  const { reads, audioCd } = slowCd(() => current);
+  const { service, state, request } = await fixture(t, 0, audioCd);
+  current = state;
+  const run = service.run, readsDuringEncode = [];
+  service.run = async (name, args, options) => {
+    if (name === 'atracdenc') { await new Promise(r => setTimeout(r, 5)); readsDuringEncode.push(reads.length); }
+    return run(name, args, options);
+  };
+  service.files.clear();
+  await service.addCd({ device: '/dev/sr0', revision: 'cd-one', tracks: [1, 2, 3] });
+  await service.upload({ ...request(), mode: 'LP4' }, async () => true);
+  // The drive reads track 2 while track 1 is encoded, and track 3 while track 2 is.
+  assert.deepEqual(readsDuringEncode, [2, 3, 3]);
+  // Track 2's read started before track 1 was sent, track 3's before track 2 was.
+  assert.deepEqual(reads.map(r => [r.number, r.sendsAtStart]), [[1, 0], [2, 0], [3, 1]]);
+  assert.deepEqual(service.disc.tracks.map(t => t.name), ['Track 1', 'Track 2', 'Track 3']);
+  assert.equal(service.files.size, 0);
+});
+
+test('a failed read of the next track lets the current track finish, then stops with that track queued', async t => {
+  let current;
+  const { audioCd } = slowCd(() => current, 2);
+  const { service, state, request, disc } = await fixture(t, 0, audioCd);
+  current = state;
+  service.files.clear();
+  await service.addCd({ device: '/dev/sr0', revision: 'cd-one', tracks: [1, 2, 3] });
+  await assert.rejects(service.upload(request(), async () => true), /Scratched CD/);
+  assert.equal(state.sends, 1);
+  assert.deepEqual(disc.tracks.map(t => t.name), ['Track 1']);
+  assert.deepEqual([...service.files.values()].map(f => f.title), ['Track 2', 'Track 3']);
+  assert.equal(service.gate.busy, false);
+});
+
+test('a failed transfer cancels the background read before the queue stops', async t => {
+  let current;
+  const { reads, audioCd } = slowCd(() => current);
+  const { service, state, request } = await fixture(t, 1, audioCd);
+  current = state;
+  service.files.clear();
+  await service.addCd({ device: '/dev/sr0', revision: 'cd-one', tracks: [1, 2, 3] });
+  await assert.rejects(service.upload(request(), async () => true), /communication.*failed/);
+  assert.equal(state.sends, 1);
+  assert.deepEqual(reads.map(r => [r.number, Boolean(r.cancelled), r.signal.aborted]), [[1, false, true], [2, true, true]]);
+  assert.equal(recorderCalls(state).at(-1)[2], 'send');
+  assert.equal(service.files.size, 3);
+});
+
+test('stop after this track cancels the background read and records nothing more', async t => {
+  let current;
+  const { reads, audioCd } = slowCd(() => current);
+  const { service, state, request } = await fixture(t, 0, audioCd);
+  current = state;
+  const run = service.run;
+  service.run = async (name, args, options) => {
+    if (args[1] === 'send') service.stopRequested = true;
+    return run(name, args, options);
+  };
+  service.files.clear();
+  await service.addCd({ device: '/dev/sr0', revision: 'cd-one', tracks: [1, 2, 3] });
+  const result = await service.upload(request(), async () => true);
+  assert.deepEqual([result.completed.length, result.cancelled, state.sends], [1, true, 1]);
+  assert.equal(reads.length, 2);
+  assert.equal(reads[1].signal.aborted, true);
+  assert.deepEqual([...service.files.values()].map(f => f.title), ['Track 2', 'Track 3']);
+});
+
 test('an invalid speed cannot reach a helper or recording confirmation through IPC', async t => {
   const { service, state, request } = await fixture(t, 0);
   const before = state.calls.length;
@@ -288,8 +386,10 @@ test('a failed encoding is identified, stops before USB transfer and preserves t
   state.failEncoding = true;
   await assert.rejects(service.upload({ ...request(), mode: 'LP4' }, async () => true), /Encoding failed/);
   assert.equal(state.sends, 0); assert.equal(service.files.size, 2);
-  const finished = service.logs.filter(l => l.event === 'recording-stage-finish');
+  const finished = service.logs.filter(l => l.event === 'recording-stage-finish' && l.track === 1);
   assert.deepEqual(finished.map(l => [l.stage, l.success]), [['convert', true], ['encode', false]]);
+  // The next file may have been prepared meanwhile, but never checked against or sent to the disc.
+  assert.ok(service.logs.filter(l => l.event === 'recording-stage-start' && l.track === 2).every(l => ['convert', 'encode'].includes(l.stage)));
   assert.equal(state.statuses.at(-1).busy, false);
   assert.equal(state.statuses.at(-1).stage, undefined);
 });
@@ -313,7 +413,7 @@ test('commit followed by cleanup failure removes only the committed queue item a
   await assert.rejects(service.upload(request(), async () => true), /committed the track/);
   assert.equal(state.sends, 1); assert.deepEqual(state.uploaded, ['first']);
   assert.deepEqual([...service.files.keys()], ['second']);
-  assert.equal(state.calls.at(-1)[2], 'send');
+  assert.equal(recorderCalls(state).at(-1)[2], 'send');
   state.key = '054c:00c7:1:3'; state.fail = false;
   await service.connect();
   assert.deepEqual((await service.upload(request(), async () => true)).completed, ['second']);
@@ -339,10 +439,10 @@ test('cleanup failure on the second track preserves both committed tracks and le
   state.failAt = 2;
   service.files.set('third', { ...service.files.get('second'), id: 'third', title: 'third' });
   await assert.rejects(service.upload(request(), async () => true), /committed the track/);
-  assert.equal(state.sends, 2); assert.equal(state.converts, 2);
+  assert.equal(state.sends, 2); assert.equal(state.converts, 3);
   assert.deepEqual(state.uploaded, ['first', 'second']);
   assert.deepEqual([...service.files.keys()], ['third']);
-  assert.equal(state.calls.at(-1)[2], 'send');
+  assert.equal(recorderCalls(state).at(-1)[2], 'send');
   state.key = '054c:00c7:1:3'; state.fail = false;
   await service.connect();
   assert.deepEqual(service.disc.tracks.map(t => t.name), ['first', 'second']);

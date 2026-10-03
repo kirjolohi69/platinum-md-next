@@ -52,12 +52,12 @@ class NetMdService {
 
   setMediaState(state) { this.mediaState = state; this.emit('media-state', state); }
 
-  async tool(name, args, timeoutMs = 45000) {
+  async tool(name, args, timeoutMs = 45000, signal) {
     this.log('helper-start', { helper: name, args, timeoutMs });
     const output = helperOutputLogger(name, (...values) => this.log(...values));
     try {
       const result = await this.run(this.paths.bin(name), args, {
-        env: this.paths.env, timeoutMs,
+        env: this.paths.env, timeoutMs, signal,
         onOutput: output.onOutput
       });
       output.flush();
@@ -408,62 +408,117 @@ class NetMdService {
       disc = await this.assertUnchanged(disc.revision);
       const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'platinum-md-next-'));
       const completed = [];
+      // The next track is read and encoded while the current one is sent to
+      // the recorder. Only the computer-side preparation overlaps; everything
+      // that touches the MiniDisc still happens one step at a time, in order.
+      const background = new AbortController();
+      const entries = selected.map((track, i) => ({ track, i, timings: [],
+        context: { track: i + 1, total: selected.length, title: track.title, mode: request.mode,
+          ...(track.source === 'cd' ? { cdReadSpeed } : {}) } }));
+      const active = new Map();
+      let current = 0;
+      const publish = () => {
+        const stage = active.get(current);
+        if (!stage) return;
+        const other = [...active.keys()].find(i => i !== current);
+        this.status(`${stage.label} · ${current + 1} of ${selected.length}: ${selected[current].title}`,
+          { busy: true, recording: true, stage,
+            ...(other === undefined ? {} : { next: { label: active.get(other).label, track: other + 1, title: selected[other].title } }) });
+      };
+      const stage = async (entry, name, label, task) => {
+        const started = performance.now();
+        active.set(entry.i, { key: `${entry.i}:${name}`, name, label, timings: [...entry.timings] });
+        publish();
+        this.log('recording-stage-start', { ...entry.context, stage: name });
+        let success = false;
+        try {
+          const result = await task();
+          success = true;
+          return result;
+        } finally {
+          active.delete(entry.i);
+          const elapsedMs = Math.round(performance.now() - started);
+          entry.measurement.stages.push({ stage: name, elapsedMs, success });
+          this.log('recording-stage-finish', { ...entry.context, stage: name, elapsedMs, success });
+          if (success) entry.timings.push({ name, label, elapsedMs });
+          if (entry.i !== current) publish();
+        }
+      };
+      // Reading (CD or file decoding) runs one track at a time, in order, and
+      // at most one track ahead of the one being recorded. Encoding a track
+      // can overlap the next read, so the CD drive is rarely idle.
+      const read = async entry => {
+        const { track, i, context } = entry;
+        const { signal } = background;
+        const pcm = path.join(temporary, `track-${i}.wav`);
+        entry.measurement = { ...context, source: track.source || 'file', durationSeconds: track.duration,
+          startedAt: new Date().toISOString(), stages: [] };
+        this.transferTimings.push(entry.measurement);
+        if (this.transferTimings.length > 255) this.transferTimings.shift();
+        if (track.source === 'cd') {
+          entry.measurement.cdReadSteps = [];
+          await stage(entry, 'cd-read', 'Reading CD', () => this.audioCd.readTrack(track.cd, pcm, cdReadSpeed, detail => {
+            entry.measurement.cdReadSteps.push({ ...detail });
+            this.log('cd-read-step', { ...context, ...detail });
+          }, signal));
+        } else {
+          const stat = await fs.stat(track.path);
+          if (stat.size !== track.size || stat.mtimeMs !== track.mtimeMs) throw new Error('An audio file changed after it was added. Add it again.');
+          await stage(entry, 'convert', 'Converting audio', () => this.tool('ffmpeg',
+            ['-nostdin', '-hide_banner', '-loglevel', 'error', '-y', '-i', track.path,
+              '-map', '0:a:0', '-vn', '-map_metadata', '-1', '-ac', '2', '-ar', '44100', '-c:a', 'pcm_s16le', pcm], 30 * 60 * 1000, signal));
+        }
+        return pcm;
+      };
+      const encode = async (entry, pcm) => {
+        if (request.mode === 'SP') return pcm;
+        const encoded = path.join(temporary, `track-${entry.i}.at3`);
+        await stage(entry, 'encode', `Encoding ${request.mode}`, () => this.tool('atracdenc',
+          ['-e', 'atrac3', '-i', pcm, '-o', encoded, '--container', 'riff',
+            '--bitrate', request.mode === 'LP2' ? '128' : '64'], 30 * 60 * 1000, background.signal));
+        await fs.rm(pcm, { force: true });
+        return encoded;
+      };
+      for (const entry of entries) {
+        entry.ready = new Promise((resolve, reject) => { entry.resolve = resolve; entry.reject = reject; });
+        entry.ready.catch(() => {}); // Reported when the queue reaches this track.
+      }
+      const running = new Set();
+      let nextRead = 0, reading = false, prepareFailed = false;
+      const pump = () => {
+        if (reading || prepareFailed || this.stopRequested || background.signal.aborted ||
+            nextRead >= entries.length || nextRead > current + 1) return;
+        const entry = entries[nextRead++];
+        reading = true;
+        const work = (async () => {
+          try {
+            const pcm = await read(entry);
+            reading = false;
+            pump();
+            entry.resolve(await encode(entry, pcm));
+          } catch (error) {
+            reading = false;
+            prepareFailed = true;
+            entry.reject(error);
+          }
+        })();
+        running.add(work);
+        work.finally(() => running.delete(work));
+      };
       try {
-        for (const [i, track] of selected.entries()) {
+        for (const entry of entries) {
+          const { track, i } = entry;
           if (this.stopRequested) break;
-          const pcm = path.join(temporary, 'audio.wav');
-          const encoded = path.join(temporary, 'audio.at3');
-          const timings = [];
-          const context = { track: i + 1, total: selected.length, title: track.title, mode: request.mode,
-            ...(track.source === 'cd' ? { cdReadSpeed } : {}) };
-          const measurement = { ...context, source: track.source || 'file', durationSeconds: track.duration,
-            startedAt: new Date().toISOString(), stages: [] };
-          this.transferTimings.push(measurement);
-          if (this.transferTimings.length > 255) this.transferTimings.shift();
-          const stage = async (name, label, task) => {
-            const started = performance.now();
-            this.status(`${label} · ${i + 1} of ${selected.length}: ${track.title}`,
-              { busy: true, recording: true, stage: { name, label, timings: [...timings] } });
-            this.log('recording-stage-start', { ...context, stage: name });
-            let success = false;
-            try {
-              const result = await task();
-              success = true;
-              return result;
-            } finally {
-              const elapsedMs = Math.round(performance.now() - started);
-              measurement.stages.push({ stage: name, elapsedMs, success });
-              this.log('recording-stage-finish', { ...context, stage: name, elapsedMs, success });
-              if (success) timings.push({ name, label, elapsedMs });
-            }
-          };
-          if (track.source === 'cd') {
-            await fs.rm(pcm, { force: true });
-            measurement.cdReadSteps = [];
-            await stage('cd-read', 'Reading CD', () => this.audioCd.readTrack(track.cd, pcm, cdReadSpeed, detail => {
-              measurement.cdReadSteps.push({ ...detail });
-              this.log('cd-read-step', { ...context, ...detail });
-            }));
-          } else {
-            const stat = await fs.stat(track.path);
-            if (stat.size !== track.size || stat.mtimeMs !== track.mtimeMs) throw new Error('An audio file changed after it was added. Add it again.');
-            await stage('convert', 'Converting audio', () => this.tool('ffmpeg',
-              ['-nostdin', '-hide_banner', '-loglevel', 'error', '-y', '-i', track.path,
-                '-map', '0:a:0', '-vn', '-map_metadata', '-1', '-ac', '2', '-ar', '44100', '-c:a', 'pcm_s16le', pcm], 30 * 60 * 1000));
-          }
-          let file = pcm;
-          if (request.mode !== 'SP') {
-            await stage('encode', `Encoding ${request.mode}`, () => this.tool('atracdenc',
-              ['-e', 'atrac3', '-i', pcm, '-o', encoded, '--container', 'riff',
-                '--bitrate', request.mode === 'LP2' ? '128' : '64'], 30 * 60 * 1000));
-            file = encoded;
-          }
+          current = i;
+          pump();
+          publish();
+          const file = await entry.ready;
           // Recheck after conversion: users can unplug or replace a disc while
           // an audio encoder is running. Never automatically retry a write.
-          disc = await stage('check-disc', 'Checking MiniDisc', () => this.assertUnchanged(disc.revision));
+          disc = await stage(entry, 'check-disc', 'Checking MiniDisc', () => this.assertUnchanged(disc.revision));
           const count = disc.tracks.length;
           try {
-            await stage('transfer', 'Sending to MiniDisc', () => this.tool('netmdcli', ['-v', 'send', file, track.title], 2 * 60 * 60 * 1000));
+            await stage(entry, 'transfer', 'Sending to MiniDisc', () => this.tool('netmdcli', ['-v', 'send', file, track.title], 2 * 60 * 60 * 1000));
           } catch (error) {
             this.recordingBlockedKey = this.deviceKey;
             if (error.exitCode === 2) {
@@ -482,7 +537,8 @@ class NetMdService {
           completed.push(track.id);
           this.files.delete(track.id);
           this.emit('uploaded', track.id);
-          disc = await stage('verify', 'Verifying recording', async () => {
+          await fs.rm(file, { force: true });
+          disc = await stage(entry, 'verify', 'Verifying recording', async () => {
             const result = await this.readDisc();
             if (result.tracks.length !== count + 1 || result.tracks.at(-1).name !== track.title) {
               throw new Error('The last recording could not be verified. The queue has stopped. Refresh the disc before retrying.');
@@ -509,6 +565,10 @@ class NetMdService {
         }
         return { completed, cancelled: completed.length < selected.length };
       } finally {
+        // Stop any read or encode for a track that will not be recorded now,
+        // and let it exit before its scratch files are removed.
+        background.abort();
+        await Promise.allSettled([...running]);
         // Only this process's uniquely created scratch directory is removed.
         await fs.rm(temporary, { recursive: true, force: true });
       }

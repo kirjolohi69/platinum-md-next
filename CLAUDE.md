@@ -15,6 +15,7 @@ Decisions already made (do not reopen without the owner asking):
 ## Layout
 
 - `app/` Electron main process. `service.cjs` is the core: every recorder action goes through `NetMdService.operation()` (one at a time) and every write is **verified by reading the disc back**.
+- Recording (`upload()` in `service.cjs`) is a pipeline: CD reads/file conversions run one at a time and at most one track ahead of the track being sent; encoding overlaps the next read; check-disc, send and verify stay strictly sequential. Stop or any error aborts background work (AbortSignal) and leaves unsent tracks queued.
 - `ui/` Vue 3 interface (`App.vue`), built by Vite into `dist/ui/`.
 - `app/preload.cjs` is the only bridge to the sandboxed page; `main.cjs` validates IPC senders and inputs.
 - Native helpers (`netmdcli`, `ffmpeg`, `atracdenc`, `cdparanoia`) are built from pinned sources in `packaging/native/` by `scripts/build-native.sh`. `netmdcli` comes from linux-minidisc plus `packaging/native/netmd-diagnostics.patch` (apply with `patch -p1`, not `git apply`).

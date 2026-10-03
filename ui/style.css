@@ -154,7 +154,7 @@ h1{font-size:23px;letter-spacing:-.8px;font-weight:750}
 h1 span{font-weight:400;color:var(--muted)}
 h2{font-size:20px;letter-spacing:-.5px}
 h3{font-size:20px;font-weight:600;letter-spacing:-.5px}
-.app-shell{max-width:1640px;margin:auto;padding:30px 34px 18px}
+.app-shell{max-width:1640px;margin:auto;padding:30px 34px 18px;min-height:100vh;display:flex;flex-direction:column}
 .app-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:28px}
 .brand{display:flex;align-items:center;gap:14px}
 .brand-disc{display:block;width:43px;height:43px;border-radius:11px;background:var(--metal);position:relative}
@@ -175,7 +175,7 @@ h3{font-size:20px;font-weight:600;letter-spacing:-.5px}
 .pulse{animation:blink 1.5s infinite}
 @keyframes blink{50%{opacity:.3}
 }
-.workspace{display:grid;grid-template-columns:1fr 1fr;gap:22px;min-height:550px}
+.workspace{display:grid;grid-template-columns:1fr 1fr;gap:22px;min-height:550px;flex:1}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
 .panel-heading{display:flex;align-items:center;justify-content:space-between;padding:24px 22px 19px;gap:12px}
 .panel-heading h2{overflow-wrap:anywhere}
@@ -218,6 +218,8 @@ button.primary:hover:not(:disabled){background:var(--primary-hover);color:var(--
 .icon-button{padding:3px 6px;border-color:transparent;background:transparent;font-size:16px}
 .text-button{border:0;background:transparent;padding:3px 0;font-size:11px;color:var(--accent)}
 .track-list{overflow:auto;max-height:380px}
+/* In the panels, lists use all the height the window gives them. */
+.panel>.track-list{flex:1 1 0;max-height:none;min-height:380px}
 .list-bar{display:flex;justify-content:space-between;align-items:center;padding:9px 22px;border-block:1px solid var(--line);font-size:11px;color:var(--muted)}
 .list-bar label{display:flex;gap:8px;align-items:center}
 .file-row{display:flex;align-items:center;padding:13px 12px 13px 18px;gap:10px;border-bottom:1px solid var(--line)}
