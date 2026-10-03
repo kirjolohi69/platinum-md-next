@@ -9,7 +9,7 @@ Linux desktop app (Electron + Vue) for recording music to NetMD MiniDisc recorde
 Decisions already made (do not reopen without the owner asking):
 - **Linux only.** No Windows/macOS ports (Web MiniDisc Pro already serves those users).
 - **No Hi-MD.** Neither the owner nor the family member has Hi-MD hardware.
-- More Linux packaging is wanted: `.rpm` (Fedora/openSUSE) and an AUR `PKGBUILD`, rather than an AppImage.
+- Broad Linux support through distro packages rather than an AppImage: `.deb` (Debian 12+, Ubuntu 22.04+, Mint 21+) and `.rpm` (Fedora, openSUSE) since 1.3.0, plus `packaging/arch/PKGBUILD` (repackages the release `.deb`). Not on the AUR yet: the owner has no AUR account (new registrations were closed); publish there once they can.
 - README first line is the owner's AI disclaimer; keep it exactly. LICENSE keeps both copyright lines (Gavin Benda 2019; `kirjolohi69 (Roope K.)` 2026). Never add the owner's full name or email anywhere.
 
 ## Layout
@@ -18,14 +18,14 @@ Decisions already made (do not reopen without the owner asking):
 - Recording (`upload()` in `service.cjs`) is a pipeline: CD reads/file conversions run one at a time and at most one track ahead of the track being sent; encoding overlaps the next read; check-disc, send and verify stay strictly sequential. Stop or any error aborts background work (AbortSignal) and leaves unsent tracks queued.
 - `ui/` Vue 3 interface (`App.vue`), built by Vite into `dist/ui/`.
 - `app/preload.cjs` is the only bridge to the sandboxed page; `main.cjs` validates IPC senders and inputs.
-- Native helpers (`netmdcli`, `ffmpeg`, `atracdenc`, `cdparanoia`) are built from pinned sources in `packaging/native/` by `scripts/build-native.sh`. `netmdcli` comes from linux-minidisc plus `packaging/native/netmd-diagnostics.patch` (apply with `patch -p1`, not `git apply`).
+- Everything is built on **Ubuntu 22.04** (glibc 2.35), the oldest supported system; `package-deb.py` fails if any bundled program needs a newer glibc/libstdc++. Native helpers (`netmdcli`, `ffmpeg`, `atracdenc`, `cdparanoia`) are built from pinned sources in `packaging/native/` by `scripts/build-native.sh`; their bundled libraries are pinned jammy packages in `linux-runtime.json` (regenerate with `scripts/resolve-runtime.py` after security updates). `package-rpm.py` turns the finished `.deb` into the `.rpm`. `netmdcli` comes from linux-minidisc plus `packaging/native/netmd-diagnostics.patch` (apply with `patch -p1`, not `git apply`).
 - `test/modern/*.test.cjs` is the Node test suite; `test/native/` holds the C protocol tests.
 - `docs/`: `CHANGELOG.md`, `RELEASE_<version>.md`, `INSTALL.md`, `PUBLISHING.md`, `VALIDATION.md` (hardware history), `KNOWN_ISSUES.md`, `CD_METADATA.md`.
 
 ## Checks
 
 - Fast, run before every push: `npm test` and `npm run build`.
-- Full (native build, `.deb`, install, sandboxed desktop smoke test) runs in GitHub Actions on every push and PR, about 5 minutes. Only merge when it is green.
+- Full (native build, `.deb`/`.rpm`, install, sandboxed desktop smoke test, then `scripts/test-distro.sh` installing on Debian 12/13, Ubuntu 22.04/24.04, Fedora, openSUSE Tumbleweed/Leap and Arch) runs in GitHub Actions on every push and PR. Only merge when it is green. In Claude's container, Debian/Fedora/openSUSE/Arch package servers are blocked (Ubuntu's work); container images come from `mirror.gcr.io` (Docker Hub rate-limits).
 - The desktop smoke test hangs in Claude's cloud container (it works on GitHub). To check UI behaviour locally, launch Electron under `xvfb-run` with a small harness script instead of `PLATINUM_SMOKE_TEST`.
 - Nobody but the owner can test with a real recorder. Say clearly what was and wasn't tested.
 
@@ -54,5 +54,6 @@ Ask the owner first for: anything that changes recording, disc editing, USB acce
 
 - Groups: rename/delete/move on grouped discs is hardware-tested. Creating, renaming and removing groups (disc panel **Group**, group-heading **Rename**/**Ungroup**, and `groupName` when recording) was added for 1.2.0; recording into a new group passed the owner's hardware test. Not yet tried on hardware: grouping a disc with no title (writes `0;//1-3;Name//`, as libnetmd does).
 - "Does my recorder work?" issue form and a compatibility table.
-- `.rpm` and AUR packaging.
+- 1.3.0 (built on Ubuntu 22.04; .rpm; Arch PKGBUILD) awaits the owner's install-and-record test on Mint before release.
+- After each release: update `pkgver` and `sha256sums` in `packaging/arch/PKGBUILD` to the released `.deb`.
 - Dependabot PRs #2–#7: four patch/minor updates; `actions/checkout` 7 and `actions/setup-node` 7 are majors.

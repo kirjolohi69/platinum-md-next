@@ -5,7 +5,7 @@ import hashlib
 out = Path(__file__).resolve().parent.parent / 'release'
 lines = []
 for file in sorted(out.iterdir()):
-    if file.is_file() and (file.name.endswith(('.tar.gz', '.AppImage', '.deb', '.bundle', '.zip', '.wav'))):
+    if file.is_file() and (file.name.endswith(('.tar.gz', '.AppImage', '.deb', '.rpm', '.bundle', '.zip', '.wav'))):
         digest = hashlib.sha256()
         with file.open('rb') as source:
             for chunk in iter(lambda: source.read(1024 * 1024), b''):

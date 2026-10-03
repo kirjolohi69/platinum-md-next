@@ -1,0 +1,25 @@
+# Maintainer: kirjolohi69
+# Repackages the official .deb from the GitHub release. Install with:
+#   makepkg -si
+pkgname=platinum-md-next-bin
+pkgver=1.2.0
+pkgrel=1
+pkgdesc='Record music to NetMD MiniDisc recorders (modernized fork of Platinum-MD)'
+arch=('x86_64')
+url='https://github.com/kirjolohi69/platinum-md-next'
+license=('MIT' 'GPL-2.0-or-later' 'LGPL-2.1-or-later')
+depends=('gtk3' 'nss' 'alsa-lib' 'libxss' 'libxtst' 'libxkbcommon' 'at-spi2-core' 'libcups' 'mesa'
+         'systemd-libs' 'xdg-utils' 'hicolor-icon-theme')
+provides=('platinum-md-next')
+conflicts=('platinum-md-next')
+options=('!strip' '!debug')
+install=platinum-md-next.install
+source=("https://github.com/kirjolohi69/platinum-md-next/releases/download/v${pkgver}/Platinum-MD-Next-${pkgver}-linux-amd64.deb")
+sha256sums=('72716b4c319ccce39fecf3d9706f0903aa2a040e72a5fd22377e9e1106d1d76f')
+
+package() {
+  bsdtar -xf data.tar.xz -C "$pkgdir"
+  install -d "$pkgdir/usr/bin"
+  ln -s '/opt/Platinum-MD Next/platinum-md-next' "$pkgdir/usr/bin/platinum-md-next"
+  install -Dm644 "$pkgdir/usr/share/doc/platinum-md-next/copyright" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

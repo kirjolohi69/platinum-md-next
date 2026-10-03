@@ -1,169 +1,164 @@
 {
   "architecture": "x86_64",
-  "baseline": "Ubuntu 24.04",
+  "baseline": "Ubuntu 22.04",
   "packages": [
     {
       "package": "libcap2",
-      "version": "1:2.66-5ubuntu2.4",
-      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libc/libcap2/libcap2_2.66-5ubuntu2.4_amd64.deb",
-      "sha256": "23c627c77c66552a658e62852f244f4946dc543898e0ec5428d5dc6bffde2d6a",
+      "version": "1:2.44-1ubuntu0.22.04.3",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libc/libcap2/libcap2_2.44-1ubuntu0.22.04.3_amd64.deb",
+      "sha256": "c497efb7fa3cd19a7ff297d95c7c5d678063c80c9fc230c9d034a8ee02ca8446",
       "source": "libcap2",
-      "sourceVersion": "1:2.66-5ubuntu2.4",
+      "sourceVersion": "1:2.44-1ubuntu0.22.04.3",
       "sourceFiles": [
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libc/libcap2/libcap2_2.66.orig.tar.xz",
-          "sha256": "15c40ededb3003d70a283fe587a36b7d19c8b3b554e33f86129c059a4bb466b2",
-          "filename": "libcap2_2.66.orig.tar.xz"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libc/libcap2/libcap2_2.44.orig.tar.xz",
+          "sha256": "92188359cd5be86e8e5bd3f6483ac6ce582264f912398937ef763def2205c8e1",
+          "filename": "libcap2_2.44.orig.tar.xz"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libc/libcap2/libcap2_2.66-5ubuntu2.4.debian.tar.xz",
-          "sha256": "7eb46752c6b59984494d2f641a049b9d4b394b7d1fe067729ccbc413c5943136",
-          "filename": "libcap2_2.66-5ubuntu2.4.debian.tar.xz"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libc/libcap2/libcap2_2.44-1ubuntu0.22.04.3.debian.tar.xz",
+          "sha256": "6a6435b74e9b2ec65eb1ee2b7958c37777fe005312feac37d84f4167521d135a",
+          "filename": "libcap2_2.44-1ubuntu0.22.04.3.debian.tar.xz"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libc/libcap2/libcap2_2.66-5ubuntu2.4.dsc",
-          "sha256": "8178019803f285b92e52e82cf84b0a6fc18840041270b2c588db826b8277e3e0",
-          "filename": "libcap2_2.66-5ubuntu2.4.dsc"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libc/libcap2/libcap2_2.44-1ubuntu0.22.04.3.dsc",
+          "sha256": "67523116f07081f3a8066f737b9c84f92f5e854f13f38487c1ce485a43d85bd7",
+          "filename": "libcap2_2.44-1ubuntu0.22.04.3.dsc"
         }
       ]
     },
     {
       "package": "libgcrypt20",
-      "version": "1.10.3-2ubuntu0.2",
-      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgcrypt20/libgcrypt20_1.10.3-2ubuntu0.2_amd64.deb",
-      "sha256": "957b9eeaa83cf6f2d5d5d76dbb8aa31d3297e6781d8a02fa08dcc897ae650a0b",
+      "version": "1.9.4-3ubuntu3.3",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgcrypt20/libgcrypt20_1.9.4-3ubuntu3.3_amd64.deb",
+      "sha256": "8f16329a0aabf4900271a3687890721bbef307e60983acae5b92eeff12e799b3",
       "source": "libgcrypt20",
-      "sourceVersion": "1.10.3-2ubuntu0.2",
+      "sourceVersion": "1.9.4-3ubuntu3.3",
       "sourceFiles": [
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgcrypt20/libgcrypt20_1.10.3.orig.tar.bz2",
-          "sha256": "8b0870897ac5ac67ded568dcfadf45969cfa8a6beb0fd60af2a9eadc2a3272aa",
-          "filename": "libgcrypt20_1.10.3.orig.tar.bz2"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgcrypt20/libgcrypt20_1.9.4.orig.tar.bz2",
+          "sha256": "ea849c83a72454e3ed4267697e8ca03390aee972ab421e7df69dfe42b65caaf7",
+          "filename": "libgcrypt20_1.9.4.orig.tar.bz2"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgcrypt20/libgcrypt20_1.10.3.orig.tar.bz2.asc",
-          "sha256": "f02a5f961b89c034a78decbb355ea5a8d9356df5a9636dec53ae548d7d814b14",
-          "filename": "libgcrypt20_1.10.3.orig.tar.bz2.asc"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgcrypt20/libgcrypt20_1.9.4.orig.tar.bz2.asc",
+          "sha256": "aa44cb00b779b4e75f3e63abeedd4112b10b4b92914dad8f23438fd0217a9fec",
+          "filename": "libgcrypt20_1.9.4.orig.tar.bz2.asc"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgcrypt20/libgcrypt20_1.10.3-2ubuntu0.2.debian.tar.xz",
-          "sha256": "8298a57538f427d3c1112f2d86e374dd8223156e06b403f5c7945dd3d86f2050",
-          "filename": "libgcrypt20_1.10.3-2ubuntu0.2.debian.tar.xz"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgcrypt20/libgcrypt20_1.9.4-3ubuntu3.3.debian.tar.xz",
+          "sha256": "184bf9126ee3a38c70bcdd584bcf363c564848ef3329546b18082ded62bf68d7",
+          "filename": "libgcrypt20_1.9.4-3ubuntu3.3.debian.tar.xz"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgcrypt20/libgcrypt20_1.10.3-2ubuntu0.2.dsc",
-          "sha256": "688df10bc9c90b241926470d1f12a4d5092157263a6c1555996c53bcf40ca7d1",
-          "filename": "libgcrypt20_1.10.3-2ubuntu0.2.dsc"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgcrypt20/libgcrypt20_1.9.4-3ubuntu3.3.dsc",
+          "sha256": "d5f3d4082c4c6ab97d500dd299d0b45644dde808709a030502158831eacd76c2",
+          "filename": "libgcrypt20_1.9.4-3ubuntu3.3.dsc"
         }
       ]
     },
     {
       "package": "libgpg-error0",
-      "version": "1.47-3build2.1",
-      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgpg-error/libgpg-error0_1.47-3build2.1_amd64.deb",
-      "sha256": "93654ee8180a73a0363f25c51dc673d67cbabcbecd164187b8a2deb54d007aef",
+      "version": "1.43-3",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgpg-error/libgpg-error0_1.43-3_amd64.deb",
+      "sha256": "1fbacdf9bd1e431cee874a697b339f6f925182bc79bba5a112b53669b33265c5",
       "source": "libgpg-error",
-      "sourceVersion": "1.47-3build2.1",
+      "sourceVersion": "1.43-3",
       "sourceFiles": [
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgpg-error/libgpg-error_1.47.orig.tar.bz2",
-          "sha256": "9e3c670966b96ecc746c28c2c419541e3bcb787d1a73930f5e5f5e1bcbbb9bdb",
-          "filename": "libgpg-error_1.47.orig.tar.bz2"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgpg-error/libgpg-error_1.43-3.dsc",
+          "sha256": "4cebb44aa01a2dfc75eae5b5758ac73f353778e1391e55726264fabf06944a23",
+          "filename": "libgpg-error_1.43-3.dsc"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgpg-error/libgpg-error_1.47.orig.tar.bz2.asc",
-          "sha256": "6ab547bf020761e1df80b08335773a91c345ff2c1344f15b1f7d195293ab21a5",
-          "filename": "libgpg-error_1.47.orig.tar.bz2.asc"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgpg-error/libgpg-error_1.43.orig.tar.bz2",
+          "sha256": "a9ab83ca7acc442a5bd846a75b920285ff79bdb4e3d34aa382be88ed2c3aebaf",
+          "filename": "libgpg-error_1.43.orig.tar.bz2"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgpg-error/libgpg-error_1.47-3build2.1.debian.tar.xz",
-          "sha256": "f02a079a6ddf9930659c3402820b6bd190687e8f1c223f340c965a9da74abcd5",
-          "filename": "libgpg-error_1.47-3build2.1.debian.tar.xz"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgpg-error/libgpg-error_1.43.orig.tar.bz2.asc",
+          "sha256": "6f1f0354aee0abc946d7f0e604fa69d5826a312baabcc0bb4fad4f97899cfa80",
+          "filename": "libgpg-error_1.43.orig.tar.bz2.asc"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgpg-error/libgpg-error_1.47-3build2.1.dsc",
-          "sha256": "3c8abf463c9ade945fe2e9d87c4aa2bff0026964207b07e99432d9ef6d9436d8",
-          "filename": "libgpg-error_1.47-3build2.1.dsc"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libg/libgpg-error/libgpg-error_1.43-3.debian.tar.xz",
+          "sha256": "d9d4efa45fc8d58152cbfa3bbaa68ed1977d8c56b7d59a579ef4feb4ffe7ec83",
+          "filename": "libgpg-error_1.43-3.debian.tar.xz"
         }
       ]
     },
     {
       "package": "libjson-c5",
-      "version": "0.17-1build1",
-      "url": "https://archive.ubuntu.com/ubuntu/pool/main/j/json-c/libjson-c5_0.17-1build1_amd64.deb",
-      "sha256": "3ac608d78e9e981e14ba7ceb141a46e3dd3ae8d6dbb3a7ecafd2698fe9930584",
+      "version": "0.15-3~ubuntu1.22.04.2",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/j/json-c/libjson-c5_0.15-3~ubuntu1.22.04.2_amd64.deb",
+      "sha256": "5c2e5b01a03b8f185058db3946a8e01ac3750887c0a7f22dc32e49573a0c7529",
       "source": "json-c",
-      "sourceVersion": "0.17-1build1",
+      "sourceVersion": "0.15-3~ubuntu1.22.04.2",
       "sourceFiles": [
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/j/json-c/json-c_0.17-1build1.dsc",
-          "sha256": "e574ebf2f5187b696c51ee6ab11f7d0f639c839720ab9a5775acbf884cafddd3",
-          "filename": "json-c_0.17-1build1.dsc"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/j/json-c/json-c_0.15.orig.tar.gz",
+          "sha256": "4ba9a090a42cf1e12b84c64e4464bb6fb893666841d5843cc5bef90774028882",
+          "filename": "json-c_0.15.orig.tar.gz"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/j/json-c/json-c_0.17.orig.tar.gz",
-          "sha256": "024d302a3aadcbf9f78735320a6d5aedf8b77876c8ac8bbb95081ca55054c7eb",
-          "filename": "json-c_0.17.orig.tar.gz"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/j/json-c/json-c_0.15-3~ubuntu1.22.04.2.debian.tar.xz",
+          "sha256": "c3a20d986ab56e0c453a1a4cab1cfc6750b155ce9bb82546897070e6c6991a01",
+          "filename": "json-c_0.15-3~ubuntu1.22.04.2.debian.tar.xz"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/j/json-c/json-c_0.17-1build1.debian.tar.xz",
-          "sha256": "31e72da83a72fc0d51559ecbd9d1cf3516574635d638886f273f5b6b26574467",
-          "filename": "json-c_0.17-1build1.debian.tar.xz"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/j/json-c/json-c_0.15-3~ubuntu1.22.04.2.dsc",
+          "sha256": "61051e5f5400168799b5155befe2db34bfecd0950fa41eaa52db39eb67f18952",
+          "filename": "json-c_0.15-3~ubuntu1.22.04.2.dsc"
         }
       ]
     },
     {
       "package": "libudev1",
-      "version": "255.4-1ubuntu8.17",
-      "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/systemd/libudev1_255.4-1ubuntu8.17_amd64.deb",
-      "sha256": "6efea3770f738db2fd43ebdaed3d91ef0cde8aa8387b4803080af473326ebdb0",
+      "version": "249.11-0ubuntu3.22",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/systemd/libudev1_249.11-0ubuntu3.22_amd64.deb",
+      "sha256": "48e47354d8d421b59bc2aac1437bc6b22ba04526963e4a73f9313b0dd518556b",
       "source": "systemd",
-      "sourceVersion": "255.4-1ubuntu8.17",
+      "sourceVersion": "249.11-0ubuntu3.22",
       "sourceFiles": [
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/systemd/systemd_255.4.orig.tar.gz",
-          "sha256": "96e75bd08c57ad401677456fb88ef54a9f05bb1695693013bc6ecce839640fd5",
-          "filename": "systemd_255.4.orig.tar.gz"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/systemd/systemd_249.11.orig.tar.gz",
+          "sha256": "305ba81cc33593bc2e8e9d6dc7f964b1c0a9303155fced5e6b1d236577441bf2",
+          "filename": "systemd_249.11.orig.tar.gz"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/systemd/systemd_255.4-1ubuntu8.17.debian.tar.xz",
-          "sha256": "4695ff34f83b1f7e6e02bf3cfac2e2a44ac76b6cfc5a38c0081bac6919d547bb",
-          "filename": "systemd_255.4-1ubuntu8.17.debian.tar.xz"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/systemd/systemd_249.11-0ubuntu3.22.debian.tar.xz",
+          "sha256": "4ce334b6483e938692c7fa1a29c6c69a518053a62b2b67752d57fcadf24bce57",
+          "filename": "systemd_249.11-0ubuntu3.22.debian.tar.xz"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/systemd/systemd_255.4-1ubuntu8.17.dsc",
-          "sha256": "8e5f4e5a7b7ee457214be1efd1ea1d380186c38b146d8c98af5da0f625d3c396",
-          "filename": "systemd_255.4-1ubuntu8.17.dsc"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/systemd/systemd_249.11-0ubuntu3.22.dsc",
+          "sha256": "722f7ef054c6696d19dd0eb3228668a1807011a7ba04e5cdd22e6c93a82b17d0",
+          "filename": "systemd_249.11-0ubuntu3.22.dsc"
         }
       ]
     },
     {
       "package": "libusb-1.0-0",
-      "version": "2:1.0.27-1",
-      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libu/libusb-1.0/libusb-1.0-0_1.0.27-1_amd64.deb",
-      "sha256": "d59e679a82ee2b724c556397e831e879936adbe8a007705872b65a5e1ec887b5",
+      "version": "2:1.0.25-1ubuntu2",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libu/libusb-1.0/libusb-1.0-0_1.0.25-1ubuntu2_amd64.deb",
+      "sha256": "99b98c9cc9c88c4d7f50e106e9f0cbff868c5d14809f516b1947d3d2c4638aae",
       "source": "libusb-1.0",
-      "sourceVersion": "2:1.0.27-1",
+      "sourceVersion": "2:1.0.25-1ubuntu2",
       "sourceFiles": [
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libu/libusb-1.0/libusb-1.0_1.0.27-1.dsc",
-          "sha256": "8bb3b5e8ad48159cc562cc98b1d86ab78c0c24076bfaa25175855e332392503b",
-          "filename": "libusb-1.0_1.0.27-1.dsc"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libu/libusb-1.0/libusb-1.0_1.0.25.orig.tar.bz2",
+          "sha256": "8a28ef197a797ebac2702f095e81975e2b02b2eeff2774fa909c78a74ef50849",
+          "filename": "libusb-1.0_1.0.25.orig.tar.bz2"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libu/libusb-1.0/libusb-1.0_1.0.27.orig.tar.bz2",
-          "sha256": "ffaa41d741a8a3bee244ac8e54a72ea05bf2879663c098c82fc5757853441575",
-          "filename": "libusb-1.0_1.0.27.orig.tar.bz2"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libu/libusb-1.0/libusb-1.0_1.0.25-1ubuntu2.debian.tar.xz",
+          "sha256": "d74ef813effd4678beb52893b592724c531262c78514e7748d669d37d650b7a9",
+          "filename": "libusb-1.0_1.0.25-1ubuntu2.debian.tar.xz"
         },
         {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libu/libusb-1.0/libusb-1.0_1.0.27.orig.tar.bz2.asc",
-          "sha256": "1cd22bbfe4ce382ca9b091e2a6275c48f1c776253815cbb615da295ae0bfe687",
-          "filename": "libusb-1.0_1.0.27.orig.tar.bz2.asc"
-        },
-        {
-          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libu/libusb-1.0/libusb-1.0_1.0.27-1.debian.tar.xz",
-          "sha256": "560bc02e704b8f28b04be3e6a551ccbf2b5c5cb0850864d6a5416ad05723f0b4",
-          "filename": "libusb-1.0_1.0.27-1.debian.tar.xz"
+          "url": "https://archive.ubuntu.com/ubuntu/pool/main/libu/libusb-1.0/libusb-1.0_1.0.25-1ubuntu2.dsc",
+          "sha256": "d0dd278e73f810d42be78a6eb4a3ef7f58eabd7a43e44828cd0cf608ead8658f",
+          "filename": "libusb-1.0_1.0.25-1ubuntu2.dsc"
         }
       ]
     }

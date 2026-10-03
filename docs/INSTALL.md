@@ -1,29 +1,54 @@
-# Install Platinum-MD Next 1.2.0
+# Install Platinum-MD Next 1.3.0
 
-The main download is **Platinum-MD-Next-1.2.0-linux-amd64.deb**. It contains the application, desktop runtime, NetMD helper, audio converters, CD reader, source and licenses. No previous app folder is needed.
+Download the installer for your system from the [latest release](https://github.com/kirjolohi69/platinum-md-next/releases/latest). Each one contains the application, its desktop runtime, the NetMD helper, audio converters, CD reader, source and licenses.
 
-## Supported target
+## Supported systems
 
-Linux Mint 22 / Ubuntu 24.04 on an Intel or AMD 64-bit computer, with glibc 2.39 or newer and normal desktop sandbox support. The application has been used successfully on Linux Mint 22.3 with a Sony MZ-N910. The new installer has been checked by package extraction and simulated installation scripts; a live system installation is not claimed by those checks.
+64-bit Intel or AMD computers with one of:
 
-The `.deb` extension does not mean every Debian-based distribution is supported. Older Ubuntu/Mint versions, Debian 12, ARM computers and Alpine do not meet this package's requirements. Other systems remain unverified.
+| System | Download |
+| --- | --- |
+| Debian 12 or 13, Ubuntu 22.04 or newer, Linux Mint 21 or newer, and systems based on them (Pop!_OS, Zorin OS, LMDE 6/7, MX Linux 23/25…) | `Platinum-MD-Next-1.3.0-linux-amd64.deb` |
+| Fedora (current releases), openSUSE Tumbleweed, openSUSE Leap 15.6 | `Platinum-MD-Next-1.3.0-linux-x86_64.rpm` |
+| Arch Linux and systems based on it | Build from `packaging/arch/PKGBUILD` (see below) |
+
+Recording has been tested on Linux Mint 22.3 with a Sony MZ-N910. Every build is also installed automatically on Debian 12 and 13, Ubuntu 22.04 and 24.04, Fedora 42, openSUSE Tumbleweed and Leap 15.6, and Arch Linux to check that the app and its helpers find everything they need; those checks have no recorder attached. ARM computers (such as a Raspberry Pi) are not supported.
 
 ## Install
 
-1. Finish any recording. Close the old Platinum-MD Next window and other MiniDisc programs.
-2. Download the `.deb`. Double-click it and use your system's package installer. Enter your administrator password when the installer asks.
-3. Open **Platinum-MD Next** from your application menu.
-4. Unplug and reconnect the recorder once so the installed USB rules take effect.
+Finish any recording and close Platinum-MD Next and other MiniDisc programs first.
 
-If double-click installation does not work, right-click the folder containing the download and choose **Open in Terminal**. Run:
+**Debian, Ubuntu, Mint:** double-click the `.deb` and use your system's package installer, or open a terminal in the download folder and run:
 
 ```bash
-sudo apt install ./Platinum-MD-Next-1.2.0-linux-amd64.deb
+sudo apt install ./Platinum-MD-Next-1.3.0-linux-amd64.deb
 ```
 
-Use `apt install`, not archive extraction. It installs the desktop dependencies and registers the application. Start the app as your normal user, without `sudo` or sandbox-disabling options. Internet access may be needed for desktop dependencies from your distribution.
+**Fedora:**
 
-The same application profile is used as the earlier portable versions, so saved appearance settings, CD speed and album cache carry over. The recording queue is not saved between app sessions. Old extracted folders can be removed after the installed version is working; they do not have to be merged.
+```bash
+sudo dnf install ./Platinum-MD-Next-1.3.0-linux-x86_64.rpm
+```
+
+**openSUSE:**
+
+```bash
+sudo zypper install --allow-unsigned-rpm ./Platinum-MD-Next-1.3.0-linux-x86_64.rpm
+```
+
+**Arch Linux:** with `git` and `base-devel` installed, run:
+
+```bash
+git clone https://github.com/kirjolohi69/platinum-md-next.git
+cd platinum-md-next/packaging/arch
+makepkg -si
+```
+
+This downloads the release `.deb`, checks its checksum and turns it into an Arch package.
+
+Always install through the package manager, not by extracting files: it installs the desktop libraries the app needs and registers the app and its USB rules. Internet access may be needed for those libraries.
+
+Then open **Platinum-MD Next** from your application menu and unplug and reconnect the recorder once, so the installed USB rules take effect. Start the app as your normal user, without `sudo`.
 
 ## Recording and removing the MiniDisc
 
@@ -33,21 +58,22 @@ Keep the recorder connected and powered until the app finishes recording. On the
 
 Use **Maximum** to let the CD reader request full drive speed. A number such as 24× is a request; the drive may limit or ignore it. Accurate extraction includes synchronization and error correction, and audio extraction can be slower than the drive's advertised data speed.
 
-The app reads, encodes and transfers each track in sequence. Its status line shows which step is running. Diagnostics also preserve CD extraction, before/after disc checks and audio validation separately. This release does not claim an increased physical read speed. If reading remains unusually slow, save Diagnostics after a CD track rather than assuming the drive is faulty.
+While one track is sent to the MiniDisc, the app already reads and encodes the next one. The status line shows the current step and what is being prepared meanwhile. If reading is unusually slow, save Diagnostics after a CD track: it records the time of each step.
 
 ## Update or remove
 
-Install 1.2.0 directly over any earlier 1.0 or alpha package. It replaces the app and refreshes the menu entry; no preliminary uninstall is needed. Saved appearance, CD speed and album information are kept. If the desktop temporarily shows a cached old icon, sign out and back in after saving your work.
+Install a newer version the same way, directly over the old one; no uninstall is needed. Saved appearance, CD speed and album information are kept. On Debian-based systems the package version may be shown as `1:1.3.0`; the leading `1:` keeps it newer than the old 2.0 test builds.
 
-Install a later `.deb` the same way. It replaces the installed app; no folder merging is required. Package-manager version `1:1.2.0` may be displayed: the leading `1:` ensures the 1.0 release sorts newer than the old 2.0 alpha packages. The app itself displays 1.2.0.
+To remove the app:
 
-To remove the installed application:
+| System | Command |
+| --- | --- |
+| Debian, Ubuntu, Mint | `sudo apt remove platinum-md-next` |
+| Fedora | `sudo dnf remove platinum-md-next` |
+| openSUSE | `sudo zypper remove platinum-md-next` |
+| Arch Linux | `sudo pacman -R platinum-md-next-bin` |
 
-```bash
-sudo apt remove platinum-md-next
-```
-
-Your personal settings are left in your home directory. The application and its package-managed USB rule are removed. Unrelated rules you installed manually are left alone.
+Your personal settings are left in your home directory. The app and its USB rule are removed.
 
 ## Source and help
 

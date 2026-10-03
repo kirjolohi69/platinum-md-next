@@ -125,7 +125,7 @@ elif name not in ['update-alternatives','update-mime-database','update-desktop-d
 version = run('dpkg-deb', '--field', archive, 'Version').strip()
 assert version == f'{meta["debianEpoch"]}:{meta["version"]}'
 assert run('dpkg-deb', '--field', archive, 'Architecture').strip() == 'amd64'
-assert 'libc6 (>= 2.39)' in run('dpkg-deb', '--field', archive, 'Depends')
+assert 'libc6 (>= 2.35)' in run('dpkg-deb', '--field', archive, 'Depends')
 for previous in ['2.0.0~alpha.2', '2.0.0~alpha.10', '1:1.0.0']:
     run('dpkg', '--compare-versions', version, 'gt', previous)
 archive_modes = {}

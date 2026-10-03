@@ -6,11 +6,33 @@ No Ruby/FPM runtime or root account is needed to create the package.
 from pathlib import Path
 import hashlib
 import json
+import re
 import os
 import shutil
 import subprocess
 import tempfile
 from package_support import digest, validate_app, verified_commit
+
+# The oldest systems supported: Ubuntu 22.04 (glibc 2.35, GCC 12 libstdc++)
+# and Debian 12 (glibc 2.36). The build fails if any bundled program needs more.
+GLIBC, GLIBCXX = '2.35', '3.4.30'
+
+
+def newest_symbol_versions(folder):
+    needed = {'GLIBC': '0', 'GLIBCXX': '0'}
+    for file in folder.rglob('*'):
+        if not file.is_file() or file.is_symlink():
+            continue
+        with file.open('rb') as stream:
+            if stream.read(4) != b'\x7fELF':
+                continue
+        symbols = subprocess.run(['objdump', '-T', str(file)], capture_output=True, text=True).stdout
+        for prefix in needed:
+            for found in re.findall(rf'\b{prefix}_([0-9.]+)\b', symbols):
+                if tuple(map(int, found.split('.'))) > tuple(map(int, needed[prefix].split('.'))):
+                    needed[prefix] = found
+    return needed
+
 
 root = Path(__file__).resolve().parent.parent
 metadata = json.loads((root / 'package.json').read_text())
@@ -24,6 +46,10 @@ desktop = metadata['desktopName']
 source = root / 'release/linux-unpacked'
 commit = verified_commit()
 validate_app(source)
+needed = newest_symbol_versions(source)
+for prefix, limit in [('GLIBC', GLIBC), ('GLIBCXX', GLIBCXX)]:
+    assert tuple(map(int, needed[prefix].split('.'))) <= tuple(map(int, limit.split('.'))), \
+        f'A bundled program needs {prefix} {needed[prefix]}, newer than the supported {limit}. Build on Ubuntu 22.04.'
 assert (source / executable).is_file(), 'Run package:dir or the AppImage build first.'
 assert (source / 'resources/app.asar').is_file(), 'Missing packaged application.'
 for value in (product, executable, desktop):
@@ -50,12 +76,12 @@ Priority: optional
 Architecture: amd64
 Maintainer: Platinum-MD Next contributors
 Installed-Size: {installed_size}
-Depends: libc6 (>= 2.39), libstdc++6 (>= 13.2), libgcc-s1, libgtk-3-0 | libgtk-3-0t64, libnss3, libasound2 | libasound2t64, libgbm1, libcups2 | libcups2t64, libudev1, libxkbcommon0, libxss1, libxtst6, libatspi2.0-0 | libatspi2.0-0t64, xdg-utils
+Depends: libc6 (>= {GLIBC}), libstdc++6 (>= 12), libgcc-s1, libgtk-3-0 | libgtk-3-0t64, libnss3, libasound2 | libasound2t64, libgbm1, libcups2 | libcups2t64, libudev1, libxkbcommon0, libxss1, libxtst6, libatspi2.0-0 | libatspi2.0-0t64, xdg-utils
 Homepage: {metadata['homepage']}
 Description: Manage and record music to a NetMD MiniDisc recorder
  Record audio files and CDs in SP, LP2 or LP4, look up CD album information,
  edit tracks and control playback. Includes the desktop runtime and tools.
- Targets Linux Mint 22 and Ubuntu 24.04 on Intel/AMD 64-bit computers.
+ Runs on Ubuntu 22.04, Linux Mint 21, Debian 12 and newer, on Intel/AMD 64-bit computers.
 ''')
     for template, name, guard in [
         ('after-install.sh', 'postinst', '[ "$1" = configure ] || exit 0'),
@@ -104,7 +130,6 @@ Categories=AudioVideo;Audio;
     payload = [f for f in sorted(stage.rglob('*')) if f.is_file() and control not in f.parents]
     installed_size = sum(f.stat().st_size for f in payload) // 1024
     content = (control / 'control').read_text()
-    import re
     (control / 'control').write_text(re.sub(r'Installed-Size: \d+', f'Installed-Size: {installed_size}', content))
     with (control / 'md5sums').open('w') as checksums:
         for file in payload:

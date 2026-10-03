@@ -1,0 +1,13 @@
+# Lets the app reach NetMD recorders without root: reload the USB rules it installs.
+post_install() {
+  udevadm control --reload-rules 2>/dev/null || true
+  echo 'Unplug and reconnect your NetMD recorder once before starting Platinum-MD Next.'
+}
+
+post_upgrade() {
+  udevadm control --reload-rules 2>/dev/null || true
+}
+
+post_remove() {
+  udevadm control --reload-rules 2>/dev/null || true
+}
