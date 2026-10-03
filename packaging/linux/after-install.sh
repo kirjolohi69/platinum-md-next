@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# dpkg keeps the permissions of folders that already exist, so upgrading over
+# an older build whose folder was owner-only would leave the app unreadable for
+# normal users (and hidden from the menu). Repair them on every configure.
+chmod -R a+rX '/opt/${sanitizedProductName}'
+
 if type update-alternatives >/dev/null 2>&1; then
     # Remove previous link if it doesn't use update-alternatives
     if [ -L '/usr/bin/${executable}' -a -e '/usr/bin/${executable}' -a "`readlink '/usr/bin/${executable}'`" != '/etc/alternatives/${executable}' ]; then
