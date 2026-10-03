@@ -17,7 +17,7 @@ set -euo pipefail
 [ -f /pkg/setup.sh ] && . /pkg/setup.sh
 . /etc/os-release
 echo "== Installing on $PRETTY_NAME"
-case "$ID $ID_LIKE" in
+case "$ID ${ID_LIKE:-}" in
   *debian*|*ubuntu*)
     apt-get update -qq
     apt-get install -y -qq /pkg/app.deb >/tmp/install.log 2>&1 || { tail -30 /tmp/install.log; exit 1; }
