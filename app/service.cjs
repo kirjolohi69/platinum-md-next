@@ -23,6 +23,7 @@ class NetMdService {
     this.paths = paths;
     this.emit = emit;
     this.run = dependencies.run || runTool;
+    this.sleep = dependencies.sleep || (ms => new Promise(resolve => setTimeout(resolve, ms)));
     this.enumerate = dependencies.enumerate || enumerateUsb;
     this.gate = new OperationGate();
     this.disc = null;
@@ -97,11 +98,25 @@ class NetMdService {
     this.recordingBlockedKey = null;
   }
 
+  // netmdcli exits 3 when it failed before sending anything to the recorder,
+  // for example while the recorder is still busy after the previous change.
+  // Only then is one more attempt safe; any other failure may have changed
+  // the disc and is never repeated.
+  async netmd(args, timeoutMs) {
+    try { return await this.tool('netmdcli', args, timeoutMs); }
+    catch (error) {
+      if (error.exitCode !== 3) throw error;
+      this.log('helper-retry-nothing-sent', { command: String(args[0]) });
+      await this.sleep(2000);
+      return this.tool('netmdcli', args, timeoutMs);
+    }
+  }
+
   async readDisc(allowNoDisc = false) {
     const device = requireOneDevice(await this.enumerate());
     this.requireReadySession(device);
     this.log('usb-open-request', device);
-    const result = await this.tool('netmdcli', ['-v']);
+    const result = await this.netmd(['-v']);
     const after = requireOneDevice(await this.enumerate());
     if (after.key !== device.key) throw new Error('The recorder disconnected during the operation. Reconnect and retry.');
     this.deviceKey = device.key;
@@ -244,7 +259,7 @@ class NetMdService {
     // The previous group line stays in Diagnostics so it can be restored by hand.
     this.log('group-title-write', { before: current.rawTitle, after: raw });
     const failed = 'The updated groups could not be saved and verified. Check the groups on the recorder before changing anything else. The earlier group information is saved in Diagnostics.';
-    try { await this.tool('netmdcli', ['settitle', raw]); } catch { throw new Error(failed); }
+    try { await this.netmd(['settitle', raw]); } catch { throw new Error(failed); }
     const after = await this.readDisc();
     const tracks = disc => JSON.stringify(disc.tracks.map(({ no, ...t }) => t));
     if (tracks(after) !== tracks(current) || typeof after.rawTitle !== 'string' ||
@@ -254,7 +269,7 @@ class NetMdService {
 
   async edit(request, confirm) {
     const { action, revision } = request || {};
-    if (!['renameTrack', 'renameDisc', 'deleteTracks', 'moveTrack', 'play', 'pause', 'stop', 'next', 'previous'].includes(action)) {
+    if (!['renameTrack', 'renameDisc', 'deleteTracks', 'moveTrack', 'repairGroups', 'play', 'pause', 'stop', 'next', 'previous'].includes(action)) {
       throw new Error('Unknown device action.');
     }
     return this.operation('Updating the recorder…', async () => {
@@ -268,7 +283,7 @@ class NetMdService {
       if (action === 'renameTrack') {
         const index = trackNumber(request.track, current.tracks.length);
         const title = safeTitle(request.title);
-        await this.tool('netmdcli', ['rename', index, title]);
+        await this.netmd(['rename', index, title]);
         current = await this.readDisc();
         if (current.tracks[index]?.name !== title) throw new Error('The title change could not be verified. Refresh the disc before trying again.');
       } else if (action === 'renameDisc') {
@@ -277,7 +292,7 @@ class NetMdService {
         if (current.groupCount > 1) {
           current = await this.writeGroups(current, { title, groups: current.groups });
         } else {
-          await this.tool('netmdcli', ['settitle', title]);
+          await this.netmd(['settitle', title]);
           current = await this.readDisc();
         }
         if (current.title !== title) throw new Error('The disc title change could not be verified.');
@@ -293,7 +308,7 @@ class NetMdService {
           const expected = current.tracks.map(({ no, ...track }) => track);
           expected.splice(to, 0, expected.splice(from, 1)[0]);
           const before = current;
-          await this.tool('netmdcli', ['move', from, to]);
+          await this.netmd(['move', from, to]);
           current = await this.readDisc();
           if (JSON.stringify(expected) !== JSON.stringify(current.tracks.map(({ no, ...t }) => t))) {
             throw new Error('The new track order could not be verified. Refresh the disc before continuing.');
@@ -303,6 +318,13 @@ class NetMdService {
             current = await this.writeGroups(current, { title: before.groupedTitle, groups: plan.groups });
           }
         }
+      } else if (action === 'repairGroups') {
+        const repair = current.groupsRepair;
+        if (!repair) throw new Error('This disc\'s groups do not need repairing.');
+        const range = g => g.start === null ? 'no tracks' : g.start === g.end ? `track ${g.start + 1}` : `tracks ${g.start + 1}-${g.end + 1}`;
+        const changes = repair.changes.map(c => c.after ? `${c.name}: ${range(c.before)} → ${range(c.after)}` : `${c.name}: removed (no tracks left)`).join('\n');
+        if (!await confirm('Repair this disc\'s groups?', `Some groups refer to tracks that are no longer on the disc. They will be shortened to end at the last track:\n${changes}`)) return current;
+        current = await this.writeGroups(current, { title: current.groupedTitle, groups: repair.groups });
       } else if (action === 'deleteTracks') {
         this.requireEditableGroups(current);
         if (!Array.isArray(request.tracks) || !request.tracks.length || request.tracks.length > 255) throw new Error('Select tracks to delete.');
@@ -327,7 +349,7 @@ class NetMdService {
           const grouped = before.groupCount > 1;
           const plan = grouped ? groupTitles.deleteTrack(before.groups, index) : null;
           const expected = before.tracks.filter((_, i) => i !== index).map(({ no, ...t }) => t);
-          await this.tool('netmdcli', ['delete', index, index], 90000);
+          await this.netmd(['delete', index, index], 90000);
           current = await this.readDisc();
           if (JSON.stringify(expected) !== JSON.stringify(current.tracks.map(({ no, ...t }) => t))) {
             throw new Error('Deletion could not be verified. No further tracks were deleted. Refresh the disc.');
