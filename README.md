@@ -20,15 +20,15 @@ Record music to NetMD MiniDisc recorders from Linux. A modernized fork of [Plati
 
 <!-- download-start -->
 
-[Download the installer](https://github.com/kirjolohi69/platinum-md-next/releases/latest): `.deb` for Debian, Ubuntu and Mint, `.rpm` for Fedora and openSUSE. Arch Linux users can build a package with [`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD).
+[Download the .deb installer](https://github.com/kirjolohi69/platinum-md-next/releases/latest).
 
 <!-- download-end -->
 
-Double-click the downloaded file to install it, or see the [installation guide](docs/INSTALL.md) for terminal commands, updating and removal. Open **Platinum-MD Next** from the application menu and connect your recorder. If it was already plugged in, unplug and reconnect it once.
+Double-click the `.deb` to install it, or run `sudo apt install ./Platinum-MD-Next-*-linux-amd64.deb`. Open **Platinum-MD Next** from the application menu and connect your recorder. If it was already plugged in, unplug and reconnect it once.
 
-**Requirements:** a 64-bit Intel/AMD computer with Debian 12 or newer, Ubuntu 22.04 or newer, Linux Mint 21 or newer, Fedora, openSUSE or Arch Linux.
+**Requirements:** Linux Mint 22 or Ubuntu 24.04, 64-bit Intel/AMD. See the [installation guide](docs/INSTALL.md) for upgrading and removal.
 
-Recording is tested with a Sony MZ-N910 on Linux Mint 22.3; every build is also installed automatically on Debian, Ubuntu, Fedora, openSUSE and Arch to check that it installs and finds everything it needs. Other NetMD recorders are untested; reports are welcome in [Issues](https://github.com/kirjolohi69/platinum-md-next/issues). Use **Diagnostics → Save report** when reporting a problem, and check the report for private file names first.
+Tested with a Sony MZ-N910 on Linux Mint 22.3. Other NetMD recorders are untested; reports are welcome in [Issues](https://github.com/kirjolohi69/platinum-md-next/issues). Use **Diagnostics → Save report** when reporting a problem, and check the report for private file names first.
 
 ## Good to know
 
