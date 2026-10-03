@@ -30,7 +30,7 @@ const diagnostics = ref(false), logs = ref([]), editor = ref(null), editValue = 
 const cdDialog = ref(null), cdDrives = ref([]), cdDevice = ref(''), audioCd = ref(null), cdError = ref('');
 const cdSelection = computed(() => audioCd.value?.tracks.filter(t => t.selected) || []);
 const cdMatches = ref([]), cdRelease = ref(''), lookupBusy = ref(false), lookupMessage = ref('');
-const automaticLookup = ref(true), useAlbumTitle = ref(true);
+const automaticLookup = ref(true), useAlbumTitle = ref(true), useGroup = ref(false), groupName = ref('');
 try { automaticLookup.value = localStorage.getItem('platinum-md-next.cd-lookup') !== 'off'; } catch {}
 let lookupSequence = 0;
 watch(automaticLookup, enabled => {
@@ -52,6 +52,19 @@ const suggestedDiscTitle = computed(() => {
     picked.value.every(f => f.albumKey === first.albumKey) ? first.suggestedDiscTitle || '' : '';
 });
 const canEdit = computed(() => disc.value && !busy.value);
+const canGroup = computed(() => typeof disc.value?.groupedTitle === 'string' && !disc.value.groupingNote);
+// The album name of the selected queue items, offered as the new group's name.
+const suggestedGroupName = computed(() => {
+  const first = picked.value[0];
+  return first?.albumKey && picked.value.every(f => f.albumKey === first.albumKey) ? first.album || '' : '';
+});
+watch(suggestedGroupName, name => { groupName.value = name; }, { immediate: true });
+// Selected disc tracks that can become a group: a continuous run outside any group.
+const groupSelection = computed(() => {
+  const sorted = [...selected.value].sort((a, b) => a - b);
+  if (!sorted.length || sorted.at(-1) - sorted[0] + 1 !== sorted.length || sorted.some(no => inGroup(no))) return null;
+  return sorted;
+});
 const discFull = computed(() => /^00:00:00\.00$/.test(disc.value?.availableTime || ''));
 const recordingUnavailable = computed(() => {
   if (!disc.value) return '';
@@ -155,10 +168,12 @@ function reorder(index, offset) {
   [list[index], list[target]] = [list[target], list[index]];
   files.value = list;
 }
-function edit(type, track = null) {
-  editor.value = { type, track };
-  editValue.value = type === 'renameDisc' ? disc.value.title : type === 'moveTrack' ? String(track.no + 1) : track.title ?? track.name;
+function edit(type, track = null, group = null) {
+  editor.value = { type, track, group };
+  editValue.value = type === 'renameDisc' ? disc.value.title : type === 'moveTrack' ? String(track.no + 1) :
+    type === 'createGroup' ? '' : type === 'renameGroup' ? group.name : track.title ?? track.name;
 }
+const editorHeading = type => ({ moveTrack: 'Move track', createGroup: 'New group', renameGroup: 'Rename group' })[type] || 'Edit title';
 async function saveEdit() {
   const { type, track } = editor.value;
   if (type === 'localTitle') {
@@ -170,6 +185,8 @@ async function saveEdit() {
   const request = { action: type, revision: disc.value.revision, title: editValue.value };
   if (track) request.track = track.no;
   if (type === 'moveTrack') request.to = Number(editValue.value) - 1;
+  if (type === 'createGroup') request.tracks = [...groupSelection.value];
+  if (type === 'renameGroup') request.group = disc.value.groups.indexOf(editor.value.group);
   editor.value = null;
   await perform(() => api.edit(request));
 }
@@ -178,6 +195,7 @@ async function record() {
   const result = await perform(() => api.upload({ mode: mode.value, revision: disc.value.revision,
     cdReadSpeed: cdReadSpeed.value,
     discTitle: useAlbumTitle.value ? suggestedDiscTitle.value : '',
+    groupName: canGroup.value && useGroup.value ? groupName.value : '',
     tracks: picked.value.map(f => ({ id: f.id, title: f.title })) }));
   if (result?.completed?.length) message.value = `${result.completed.length} track(s) recorded. After disconnecting, press STOP on the recorder and wait for TOC Edit to clear before opening the lid.`;
 }
@@ -185,6 +203,9 @@ async function action(name) {
   await perform(() => api.edit({ action: name, revision: disc.value.revision,
     ...(name === 'play' && oneTrack.value ? { track: oneTrack.value.no } : {}),
     ...(name === 'deleteTracks' ? { tracks: [...selected.value] } : {}) }));
+}
+async function removeGroup(group) {
+  await perform(() => api.edit({ action: 'removeGroup', revision: disc.value.revision, group: disc.value.groups.indexOf(group) }));
 }
 async function saveReport() {
   await perform(async () => { if (await api.saveDiagnostics()) message.value = 'Diagnostic report saved.'; });
@@ -263,8 +284,9 @@ onUnmounted(() => { unsubscribe?.(); clearInterval(stageClock); systemTheme.remo
           </template>
           <p v-if="files.some(f => f.source === 'cd')" class="hint">Keep the audio CD in its drive until recording finishes. Click a queued title to rename it.</p>
           <label v-if="suggestedDiscTitle" class="album-disc-title"><input v-model="useAlbumTitle" type="checkbox" :disabled="busy"><span>Name this MiniDisc <strong>{{ suggestedDiscTitle }}</strong></span></label>
+          <div v-if="disc && canGroup" class="group-option"><label class="album-disc-title"><input v-model="useGroup" type="checkbox" :disabled="busy"><span>Put these tracks in a new group</span></label><input v-if="useGroup" v-model="groupName" :disabled="busy" maxlength="120" aria-label="Group name" placeholder="Group name, e.g. the album"></div>
           <p v-if="recordingUnavailable" class="hint">{{ recordingUnavailable }}</p>
-          <div class="record-footer"><div><strong>{{ picked.length }} {{ picked.length === 1 ? 'track' : 'tracks' }} selected</strong><span>{{ time(total) }} of music</span></div><button v-if="recording" class="primary" :disabled="stopping" @click="perform(async () => { await api.stopAfterTrack(); stopping = true; })">{{ stopping ? 'Stopping after this track…' : 'Stop after this track' }}</button><button v-else class="primary" :disabled="!disc || busy || !picked.length || !!recordingUnavailable" @click="record">{{ discFull ? 'Disc full' : 'Record to MiniDisc →' }}</button></div>
+          <div class="record-footer"><div><strong>{{ picked.length }} {{ picked.length === 1 ? 'track' : 'tracks' }} selected</strong><span>{{ time(total) }} of music</span></div><button v-if="recording" class="primary" :disabled="stopping" @click="perform(async () => { await api.stopAfterTrack(); stopping = true; })">{{ stopping ? 'Stopping after this track…' : 'Stop after this track' }}</button><button v-else class="primary" :disabled="!disc || busy || !picked.length || !!recordingUnavailable || (canGroup && useGroup && !groupName.trim())" @click="record">{{ discFull ? 'Disc full' : 'Record to MiniDisc →' }}</button></div>
         </div>
       </section>
 
@@ -272,11 +294,11 @@ onUnmounted(() => { unsubscribe?.(); clearInterval(stageClock); systemTheme.remo
         <div class="panel-heading"><div><p class="eyebrow">ON YOUR RECORDER</p><h2>{{ disc?.title || 'Your MiniDisc' }}</h2></div><button :disabled="!canEdit || groupsLocked" @click="edit('renameDisc')">Rename disc</button></div>
         <template v-if="disc">
           <div class="disc-summary"><span>{{ disc.tracks.length }} tracks</span><span :class="{ 'disc-full': discFull }">{{ discFull ? 'Disc full · no space left' : `${disc.availableTime.replace(/\.\d+$/, '')} free in SP` }}</span></div>
-          <p v-if="disc.groupCount > 1 && !groupsLocked" class="group-notice">This disc has groups, shown in the list below. Moving and deleting tracks or renaming the disc keeps them up to date. New recordings are added after the last track, outside the groups.</p>
+          <p v-if="disc.groupCount > 1 && !groupsLocked" class="group-notice">This disc has groups, shown in the list below. Moving and deleting tracks or renaming the disc keeps them up to date. To make a new group, select tracks that follow each other and click Group.</p>
           <div v-else-if="groupsLocked" class="group-notice"><p>{{ disc.groupsNote }} Recording still works: new tracks are added after the last track. Moving, deleting and renaming the disc are unavailable for this disc, to protect its groups.</p><button v-if="disc.groupsRepair" :disabled="!canEdit" @click="action('repairGroups')">Repair groups</button></div>
           <div v-if="!disc.tracks.length" class="empty-state"><div class="mini-disc" aria-hidden="true"><i></i></div><h3>A fresh start.</h3><p>Your MiniDisc is ready for music.</p></div>
-          <div v-else class="track-list disc-tracks"><table><thead><tr><th><input type="checkbox" :disabled="busy" :checked="selected.length === disc.tracks.length" aria-label="Select all disc tracks" @change="selected = $event.target.checked ? disc.tracks.map(t => t.no) : []"></th><th>#</th><th>TRACK</th><th>MODE</th><th>LENGTH</th></tr></thead><tbody><template v-for="track in disc.tracks" :key="track.no"><tr v-if="groupStarts.has(track.no)" class="group-row"><td></td><td colspan="4">{{ groupStarts.get(track.no).name }}<small>{{ groupStarts.get(track.no).end - track.no + 1 }} {{ groupStarts.get(track.no).end === track.no ? 'track' : 'tracks' }}</small></td></tr><tr :class="{ selected: selected.includes(track.no), 'in-group': inGroup(track.no) }"><td><input v-model="selected" type="checkbox" :value="track.no" :disabled="busy" :aria-label="`Select ${track.name}`"></td><td class="track-number">{{ String(track.no + 1).padStart(2, '0') }}</td><td class="disc-track-title">{{ track.name || 'Untitled track' }}</td><td><span class="mode-badge">{{ track.bitrate }}</span></td><td><time>{{ track.time.slice(0, -3) }}</time></td></tr></template></tbody></table></div>
-          <div class="disc-tools"><div><button :disabled="!canEdit || !oneTrack" @click="edit('renameTrack', oneTrack)">Rename</button><button :disabled="!canEdit || !oneTrack || groupsLocked" @click="edit('moveTrack', oneTrack)">Move</button><button class="danger" :disabled="!canEdit || !selected.length || groupsLocked" @click="action('deleteTracks')">Delete</button></div><span>{{ selected.length }} selected</span></div>
+          <div v-else class="track-list disc-tracks"><table><thead><tr><th><input type="checkbox" :disabled="busy" :checked="selected.length === disc.tracks.length" aria-label="Select all disc tracks" @change="selected = $event.target.checked ? disc.tracks.map(t => t.no) : []"></th><th>#</th><th>TRACK</th><th>MODE</th><th>LENGTH</th></tr></thead><tbody><template v-for="track in disc.tracks" :key="track.no"><tr v-if="groupStarts.has(track.no)" class="group-row"><td></td><td colspan="4"><div class="group-heading"><span>{{ groupStarts.get(track.no).name }}<small>{{ groupStarts.get(track.no).end - track.no + 1 }} {{ groupStarts.get(track.no).end === track.no ? 'track' : 'tracks' }}</small></span><span v-if="canGroup" class="group-actions"><button class="text-button" :disabled="!canEdit" @click="edit('renameGroup', null, groupStarts.get(track.no))">Rename</button><button class="text-button" :disabled="!canEdit" @click="removeGroup(groupStarts.get(track.no))">Ungroup</button></span></div></td></tr><tr :class="{ selected: selected.includes(track.no), 'in-group': inGroup(track.no) }"><td><input v-model="selected" type="checkbox" :value="track.no" :disabled="busy" :aria-label="`Select ${track.name}`"></td><td class="track-number">{{ String(track.no + 1).padStart(2, '0') }}</td><td class="disc-track-title">{{ track.name || 'Untitled track' }}</td><td><span class="mode-badge">{{ track.bitrate }}</span></td><td><time>{{ track.time.slice(0, -3) }}</time></td></tr></template></tbody></table></div>
+          <div class="disc-tools"><div><button :disabled="!canEdit || !oneTrack" @click="edit('renameTrack', oneTrack)">Rename</button><button :disabled="!canEdit || !oneTrack || groupsLocked" @click="edit('moveTrack', oneTrack)">Move</button><button :disabled="!canEdit || !canGroup || !groupSelection" :title="canGroup ? 'Group selected tracks that follow each other and are not in a group yet' : disc.groupingNote" @click="edit('createGroup')">Group</button><button class="danger" :disabled="!canEdit || !selected.length || groupsLocked" @click="action('deleteTracks')">Delete</button></div><span>{{ selected.length }} selected</span></div>
           <div class="playback"><span>Listen on your recorder</span><div><button :disabled="!canEdit" aria-label="Previous track" @click="action('previous')">‹</button><button :disabled="!canEdit || !disc.tracks.length" @click="action('play')">▶ Play</button><button :disabled="!canEdit" @click="action('pause')">Ⅱ Pause</button><button :disabled="!canEdit" @click="action('stop')">■ Stop</button><button :disabled="!canEdit" aria-label="Next track" @click="action('next')">›</button></div></div>
         </template>
         <div v-else class="empty-state"><div class="mini-disc" aria-hidden="true"><i></i></div><h3>{{ mediaState === 'no-disc' ? 'Insert a MiniDisc.' : 'Bring your MiniDisc back.' }}</h3><p v-if="mediaState === 'no-disc'">Your recorder is connected.<br>Insert a MiniDisc, close the lid, then choose Refresh disc.</p><p v-else>Insert a disc and connect a NetMD recorder.<br>Your tracks will appear here.</p><p class="formats">One recorder at a time · NetMD mode</p></div>
@@ -320,7 +342,7 @@ onUnmounted(() => { unsubscribe?.(); clearInterval(stageClock); systemTheme.remo
       <div class="appearance-footer"><p class="hint" role="status">{{ appearanceSaved ? 'Your choice is remembered on this computer.' : 'Applied for now. Your choice could not be saved on this computer.' }}</p><button class="text-button" @click="appearance = { ...defaultAppearance }">Reset appearance</button></div>
     </dialog>
 
-    <div v-if="editor" class="modal-backdrop" @keydown.esc="editor = null"><form class="dialog editor" role="dialog" aria-modal="true" aria-labelledby="edit-heading" @submit.prevent="saveEdit"><h2 id="edit-heading">{{ editor.type === 'moveTrack' ? 'Move track' : 'Edit title' }}</h2><label for="edit-field">{{ editor.type === 'moveTrack' ? 'New position' : 'Title (basic Latin characters)' }}</label><input id="edit-field" v-model="editValue" autofocus required :type="editor.type === 'moveTrack' ? 'number' : 'text'" :min="1" :max="disc?.tracks.length" maxlength="120"><p v-if="editor.type !== 'moveTrack'" class="hint">Accents are simplified for older NetMD displays.</p><div class="dialog-actions"><button type="button" @click="editor = null">Cancel</button><button class="primary" type="submit">Save</button></div></form></div>
+    <div v-if="editor" class="modal-backdrop" @keydown.esc="editor = null"><form class="dialog editor" role="dialog" aria-modal="true" aria-labelledby="edit-heading" @submit.prevent="saveEdit"><h2 id="edit-heading">{{ editorHeading(editor.type) }}</h2><p v-if="editor.type === 'createGroup'" class="hint">{{ groupSelection.length === 1 ? `Track ${groupSelection[0] + 1}` : `Tracks ${groupSelection[0] + 1}–${groupSelection.at(-1) + 1}` }} will be grouped. The tracks themselves are not changed.</p><label for="edit-field">{{ editor.type === 'moveTrack' ? 'New position' : ['createGroup', 'renameGroup'].includes(editor.type) ? 'Group name (basic Latin characters)' : 'Title (basic Latin characters)' }}</label><input id="edit-field" v-model="editValue" autofocus required :type="editor.type === 'moveTrack' ? 'number' : 'text'" :min="1" :max="disc?.tracks.length" maxlength="120"><p v-if="editor.type !== 'moveTrack'" class="hint">Accents are simplified for older NetMD displays.</p><div class="dialog-actions"><button type="button" @click="editor = null">Cancel</button><button class="primary" type="submit">Save</button></div></form></div>
 
     <div v-if="diagnostics" class="modal-backdrop" @keydown.esc="diagnostics = false"><section class="dialog diagnostics" role="dialog" aria-modal="true" aria-labelledby="diagnostics-heading"><div class="panel-heading"><div><p class="eyebrow">CONNECTION HELP</p><h2 id="diagnostics-heading">Diagnostics</h2></div><button aria-label="Close diagnostics" @click="diagnostics = false">Close</button></div><p>Connect your recorder with a disc inserted and close other MiniDisc apps. Retry once, then save this report if it still fails.</p><p v-if="devices.length && !devices[0].writable" class="error-message">USB access is blocked. Ask an administrator to install the included NetMD USB rule once. Run the app from your normal account.</p><div class="device-details"><strong>{{ devices[0]?.model || 'No recorder detected' }}</strong><span>{{ devices[0]?.id || 'USB device not present' }}</span><span>{{ devices[0]?.writable ? 'USB read/write access available' : 'USB access not confirmed' }}</span></div><pre tabindex="0">{{ logText || 'No diagnostic events yet.' }}</pre><div class="dialog-actions"><span class="hint">Reports may include music titles and local file paths.</span><button class="primary" @click="saveReport">Save report</button></div></section></div>
   </div>

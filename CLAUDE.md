@@ -4,11 +4,11 @@ Read this first. It is the project's memory between sessions.
 
 ## The project
 
-Linux desktop app (Electron + Vue) for recording music to NetMD MiniDisc recorders. Fork of Platinum-MD by Gavin Benda. Owned by **kirjolohi69** (Roope K.), who is not a programmer: explain things in plain language, avoid jargon, and say what they need to click or do. Built mainly for a friend of the owner; the owner tests on **Linux Mint 22.3 with a Sony MZ-N910**.
+Linux desktop app (Electron + Vue) for recording music to NetMD MiniDisc recorders. Fork of Platinum-MD by Gavin Benda. Owned by **kirjolohi69** (Roope K.), who is not a programmer: explain things in plain language, avoid jargon, and say what they need to click or do. Built mainly for a family member of the owner; the owner tests on **Linux Mint 22.3 with a Sony MZ-N910**.
 
 Decisions already made (do not reopen without the owner asking):
 - **Linux only.** No Windows/macOS ports (Web MiniDisc Pro already serves those users).
-- **No Hi-MD.** Neither the owner nor the friend has Hi-MD hardware.
+- **No Hi-MD.** Neither the owner nor the family member has Hi-MD hardware.
 - More Linux packaging is wanted: `.rpm` (Fedora/openSUSE) and an AUR `PKGBUILD`, rather than an AppImage.
 - README first line is the owner's AI disclaimer; keep it exactly. LICENSE keeps both copyright lines (Gavin Benda 2019; `kirjolohi69 (Roope K.)` 2026). Never add the owner's full name or email anywhere.
 
@@ -52,7 +52,7 @@ Ask the owner first for: anything that changes recording, disc editing, USB acce
 
 ## Open work
 
-- Grouped discs: rename/delete/move is implemented in 1.2.0 and awaits the owner's hardware test. Next step: creating and editing groups in the app.
+- Groups: rename/delete/move on grouped discs is hardware-tested. Creating, renaming and removing groups (disc panel **Group**, group-heading **Rename**/**Ungroup**, and `groupName` when recording) was added for 1.2.0 and awaits the owner's hardware test, including a disc with no title (writes `0;//1-3;Name//`, as libnetmd does).
 - "Does my recorder work?" issue form and a compatibility table.
 - `.rpm` and AUR packaging.
 - README screenshot: the owner will upload `docs/screenshot.png`, then add it under the title.
