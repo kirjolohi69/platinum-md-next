@@ -10,7 +10,7 @@ A Linux desktop application for recording music to NetMD MiniDisc recorders, bas
 
 <!-- download-start -->
 
-The owner is preparing the first public release. Use the supplied `.deb` installer until the Releases download is published. See the [publishing guide](docs/PUBLISHING.md).
+[Download the .deb installer](https://github.com/kirjolohi69/platinum-md-next/releases/latest).
 
 <!-- download-end -->
 

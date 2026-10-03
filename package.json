@@ -33,10 +33,17 @@
     "vite": "8.3.0",
     "vue": "3.5.42"
   },
-  "homepage": "https://github.com/gavinbenda/platinum-md",
+  "homepage": "https://github.com/kirjolohi69/platinum-md-next",
   "productName": "Platinum-MD Next",
   "desktopName": "platinum-md-next.desktop",
-  "musicbrainzContact": "",
+  "musicbrainzContact": "https://github.com/kirjolohi69/platinum-md-next",
   "debianEpoch": 1,
-  "releaseNotes": "docs/RELEASE_1_0_1.md"
+  "releaseNotes": "docs/RELEASE_1_0_1.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kirjolohi69/platinum-md-next.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kirjolohi69/platinum-md-next/issues"
+  }
 }
