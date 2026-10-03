@@ -1,4 +1,4 @@
-**⚠️ Note that Platinum-MD Next is 100% vibe-coded, first with ChatGPT and now with Claude ⚠️**
+**⚠️ Note that this software is 100% vibe-coded, first with ChatGPT and now with Claude ⚠️**
 
 # Platinum-MD Next
 
