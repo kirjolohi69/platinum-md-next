@@ -13,15 +13,18 @@ int netmd_exch_message(netmd_dev_handle *dev,unsigned char *cmd,const size_t len
     if(result>=25)memcpy(out+25,header,strlen(header));return result;
 }
 static void reset(const char *text) {header=text;calls=0;result=25+(int)strlen(text);status=NETMD_STATUS_ACCEPTED;}
-static void dispose(minidisc *md) {for(unsigned i=0;i<md->group_count;i++)free(md->groups[i].name);free(md->groups);}
+static void dispose(minidisc *md) {for(unsigned i=0;i<md->group_count;i++)free(md->groups[i].name);free(md->groups);free(md->raw_title);md->raw_title=NULL;}
 int main(void) {
     minidisc md={0};netmd_set_log_level(NETMD_LOG_NONE);
     reset("");assert(netmd_initialize_disc_info(NULL,&md)==0);assert(calls==1 && md.group_count==1);dispose(&md);
     reset("0;Test//1-2;Group A//3;Group B//");assert(netmd_initialize_disc_info(NULL,&md)>0);
-    assert(calls==1 && md.group_count==3 && strcmp(md.groups[2].name,"Group B")==0);dispose(&md);
-    reset("Plain title");assert(netmd_initialize_disc_info(NULL,&md)>0);assert(calls==1 && md.group_count==1);dispose(&md);
-    reset("0;Grouped//1;A//");result=NETMDERR_USB;assert(netmd_initialize_disc_info(NULL,&md)<0);assert(calls==1 && md.groups==NULL && md.group_count==0);
+    assert(calls==1 && md.group_count==3 && strcmp(md.groups[2].name,"Group B")==0);
+    /* The unparsed title survives in-place parsing, for group-preserving edits. */
+    assert(strcmp(md.raw_title,"0;Test//1-2;Group A//3;Group B//")==0);dispose(&md);
+    reset("Plain title");assert(netmd_initialize_disc_info(NULL,&md)>0);assert(calls==1 && md.group_count==1);
+    assert(strcmp(md.raw_title,"Plain title")==0);dispose(&md);
+    reset("0;Grouped//1;A//");result=NETMDERR_USB;assert(netmd_initialize_disc_info(NULL,&md)<0);assert(calls==1 && md.groups==NULL && md.group_count==0 && md.raw_title==NULL);
     reset("");result=24;assert(netmd_initialize_disc_info(NULL,&md)<0);assert(md.groups==NULL);
     reset("");status=NETMD_STATUS_REJECTED;assert(netmd_initialize_disc_info(NULL,&md)==NETMDERR_CMD_INVALID);assert(md.groups==NULL);
-    puts("Native disc header: 6 cases passed (blank/grouped discs and failed reads).");
+    puts("Native disc header: 6 cases passed (blank/grouped discs, raw titles and failed reads).");
 }

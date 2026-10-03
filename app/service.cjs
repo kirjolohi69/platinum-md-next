@@ -10,6 +10,7 @@ const { parseDisc, safeTitle, trackNumber, capacitySeconds } = require('./disc.c
 const { AudioCd, validateReadSpeed } = require('./audio-cd.cjs');
 const { CdMetadata, recorderTitle } = require('./cd-metadata.cjs');
 const { helperOutputLogger } = require('./helper-output.cjs');
+const groupTitles = require('./groups.cjs');
 
 // Tag values such as "3" or "3/12"; anything else is treated as missing.
 function tagNumber(value) {
@@ -219,6 +220,38 @@ class NetMdService {
     for (const id of ids) this.files.delete(id);
   }
 
+  requireEditableGroups(disc) {
+    if (disc.groupCount > 1 && !disc.groupsEditable) {
+      throw new Error(`${disc.groupsNote} Moving, deleting and renaming the disc are unavailable on this disc.`);
+    }
+  }
+
+  // Track commands never touch the disc title, where groups live. Check that
+  // the recorder agreed before writing the adjusted group information.
+  checkGroupsUntouched(before, after) {
+    if (after.rawTitle !== before.rawTitle) {
+      this.log('groups-changed-unexpectedly', { before: before.rawTitle, after: after.rawTitle });
+      throw new Error('The recorder changed the disc\'s group information by itself, so nothing more was changed. Check the groups on the recorder. The earlier group information is saved in Diagnostics.');
+    }
+  }
+
+  async writeGroups(current, expected) {
+    if (groupTitles.sameGroups(groupTitles.parseRawTitle(current.rawTitle), expected)) return current;
+    const raw = groupTitles.composeRawTitle(expected);
+    if (Buffer.byteLength(raw) > groupTitles.MAX_RAW_TITLE_BYTES) {
+      throw new Error('The disc title and group names together are too long for the recorder. Use a shorter title.');
+    }
+    // The previous group line stays in Diagnostics so it can be restored by hand.
+    this.log('group-title-write', { before: current.rawTitle, after: raw });
+    const failed = 'The updated groups could not be saved and verified. Check the groups on the recorder before changing anything else. The earlier group information is saved in Diagnostics.';
+    try { await this.tool('netmdcli', ['settitle', raw]); } catch { throw new Error(failed); }
+    const after = await this.readDisc();
+    const tracks = disc => JSON.stringify(disc.tracks.map(({ no, ...t }) => t));
+    if (tracks(after) !== tracks(current) || typeof after.rawTitle !== 'string' ||
+        !groupTitles.sameGroups(groupTitles.parseRawTitle(after.rawTitle), expected)) throw new Error(failed);
+    return after;
+  }
+
   async edit(request, confirm) {
     const { action, revision } = request || {};
     if (!['renameTrack', 'renameDisc', 'deleteTracks', 'moveTrack', 'play', 'pause', 'stop', 'next', 'previous'].includes(action)) {
@@ -239,37 +272,69 @@ class NetMdService {
         current = await this.readDisc();
         if (current.tracks[index]?.name !== title) throw new Error('The title change could not be verified. Refresh the disc before trying again.');
       } else if (action === 'renameDisc') {
-        if (current.groupCount > 1) throw new Error('Renaming grouped discs is not supported in this version, to preserve group information.');
+        this.requireEditableGroups(current);
         const title = safeTitle(request.title);
-        await this.tool('netmdcli', ['settitle', title]);
-        current = await this.readDisc();
+        if (current.groupCount > 1) {
+          current = await this.writeGroups(current, { title, groups: current.groups });
+        } else {
+          await this.tool('netmdcli', ['settitle', title]);
+          current = await this.readDisc();
+        }
         if (current.title !== title) throw new Error('The disc title change could not be verified.');
       } else if (action === 'moveTrack') {
-        if (current.groupCount > 1) throw new Error('Moving tracks on grouped discs is not supported in this version.');
+        this.requireEditableGroups(current);
         const from = trackNumber(request.track, current.tracks.length);
         const to = trackNumber(request.to, current.tracks.length);
         if (from !== to) {
+          const grouped = current.groupCount > 1;
+          const plan = grouped ? groupTitles.moveTrack(current.groups, current.tracks.length, from, to) : null;
+          if (plan?.removed.length && !await confirm(`Remove the group "${plan.removed[0]}"?`,
+            'This is the only track in that group. Moving it removes the empty group. The track itself is kept.')) return current;
           const expected = current.tracks.map(({ no, ...track }) => track);
           expected.splice(to, 0, expected.splice(from, 1)[0]);
+          const before = current;
           await this.tool('netmdcli', ['move', from, to]);
           current = await this.readDisc();
           if (JSON.stringify(expected) !== JSON.stringify(current.tracks.map(({ no, ...t }) => t))) {
             throw new Error('The new track order could not be verified. Refresh the disc before continuing.');
           }
+          if (grouped) {
+            this.checkGroupsUntouched(before, current);
+            current = await this.writeGroups(current, { title: before.groupedTitle, groups: plan.groups });
+          }
         }
       } else if (action === 'deleteTracks') {
-        if (current.groupCount > 1) throw new Error('Deleting tracks from grouped discs is not supported in this version.');
+        this.requireEditableGroups(current);
         if (!Array.isArray(request.tracks) || !request.tracks.length || request.tracks.length > 255) throw new Error('Select tracks to delete.');
         const indices = [...new Set(request.tracks.map(i => trackNumber(i, current.tracks.length)))].sort((a, b) => b - a);
-        const names = indices.map(i => `${i + 1}. ${current.tracks[i].name}`).join('\n');
+        let names = indices.map(i => `${i + 1}. ${current.tracks[i].name}`).join('\n');
+        if (current.groupCount > 1) {
+          let simulated = current.groups;
+          const emptied = [];
+          for (const index of indices) {
+            const step = groupTitles.deleteTrack(simulated, index);
+            simulated = step.groups;
+            emptied.push(...step.removed);
+          }
+          if (emptied.length) names += `\n\nThese groups will also be removed, because no tracks remain in them:\n${emptied.join('\n')}`;
+        }
         if (!await confirm(`Permanently delete ${indices.length} track(s)?`, names)) return current;
         current = await this.assertUnchanged(current.revision);
+        // One track at a time: each deletion is verified and the group
+        // information brought up to date before the next one.
         for (const index of indices) {
-          const expected = current.tracks.filter((_, i) => i !== index).map(({ no, ...t }) => t);
+          const before = current;
+          const grouped = before.groupCount > 1;
+          const plan = grouped ? groupTitles.deleteTrack(before.groups, index) : null;
+          const expected = before.tracks.filter((_, i) => i !== index).map(({ no, ...t }) => t);
           await this.tool('netmdcli', ['delete', index, index], 90000);
           current = await this.readDisc();
           if (JSON.stringify(expected) !== JSON.stringify(current.tracks.map(({ no, ...t }) => t))) {
             throw new Error('Deletion could not be verified. No further tracks were deleted. Refresh the disc.');
+          }
+          if (grouped) {
+            this.checkGroupsUntouched(before, current);
+            current = await this.writeGroups(current, { title: before.groupedTitle, groups: plan.groups });
           }
         }
       }
@@ -385,7 +450,7 @@ class NetMdService {
             }
             // Group information lives in the disc title. Recording only writes the
             // new track's title, so any change here means something unexpected happened.
-            if (result.title !== disc.title || result.groupCount !== disc.groupCount) {
+            if (result.title !== disc.title || result.groupCount !== disc.groupCount || result.rawTitle !== disc.rawTitle) {
               this.log('recording-disc-title-changed', { before: disc.groupCount, after: result.groupCount });
               throw new Error('The track was recorded, but the disc title or groups changed unexpectedly. The queue has stopped. Check the disc on the recorder before recording more.');
             }

@@ -810,3 +810,71 @@
 @@ -601 +652 @@
 -    exit(0);
 +    return;
+--- a/libnetmd/libnetmd.c
++++ b/libnetmd/libnetmd.c
+@@ -326,6 +326,7 @@
+     md->groups = NULL;
+     md->group_count = 0;
+     md->header_length = 0;
++    md->raw_title = NULL;
+     /* Size and parse from the same validated response. A failed query must
+      * never turn a grouped disc into an apparent empty/ungrouped disc. */
+     disc_size = request_disc_title(devh, disc, sizeof(disc));
+@@ -334,6 +335,10 @@
+     if (md->group_count == 0) return -1;
+     md->groups = calloc(md->group_count, sizeof(struct netmd_group));
+     if (md->groups == NULL) { md->group_count = 0; return -1; }
++    /* Keep the unparsed title: parsing below splits the buffer in place. */
++    md->raw_title = calloc((size_t)disc_size + 1, 1);
++    if (md->raw_title == NULL) { free(md->groups); md->groups = NULL; md->group_count = 0; return -1; }
++    memcpy(md->raw_title, disc, (size_t)disc_size);
+ 
+     if(disc_size > 0)
+     {
+@@ -1167,6 +1172,8 @@
+ 
+     free(md->groups);
+     md->groups = NULL;
++    free(md->raw_title);
++    md->raw_title = NULL;
+ }
+ 
+ /* AV/C Description Spefication OPEN DESCRIPTOR (0x08),
+--- a/libnetmd/libnetmd.h
++++ b/libnetmd/libnetmd.h
+@@ -81,6 +81,8 @@
+     size_t header_length;
+     struct netmd_group *groups;
+     unsigned int group_count;
++    /* Exact disc title as read from the device, including group data. */
++    char *raw_title;
+ } minidisc;
+ 
+ 
+--- a/netmdcli/netmdcli.c
++++ b/netmdcli/netmdcli.c
+@@ -274,6 +274,7 @@
+     json_object_object_add(json, "device",  json_object_new_string(netmd->model));
+     json_object_object_add(json, "title", json_object_new_string(md->groups[0].name ? md->groups[0].name : ""));
+     json_object_object_add(json, "groupCount", json_object_new_int(md->group_count));
++    json_object_object_add(json, "rawTitle", json_object_new_string(md->raw_title ? md->raw_title : ""));
+ 
+     /* parse commands */
+     if(argc > 1)
+@@ -317,9 +318,16 @@
+         else if(strcmp("settitle", argv[1]) == 0)
+         {
+             if (!check_args(argc, 2, "settitle")) return -1;
++            /* The title write encodes both lengths in one byte each. */
++            if (strlen(argv[2]) > 255) {
++                fprintf(stderr, "settitle: title is longer than 255 bytes\n");
++                exit_code = 1;
++                goto title_done;
++            }
+             netmd_cache_toc(devh);
+             exit_code = netmd_set_disc_title(devh, argv[2], strlen(argv[2])) < 0 ? 1 : 0;
+             netmd_sync_toc(devh);
++            title_done: ;
+         }
+         else if(strcmp("group", argv[1]) == 0)
+         {

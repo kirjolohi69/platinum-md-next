@@ -1,6 +1,7 @@
 'use strict';
 
 const { createHash } = require('node:crypto');
+const { readGroups } = require('./groups.cjs');
 
 function parseDisc(output) {
   let value;
@@ -36,6 +37,18 @@ function parseDisc(output) {
     totalTime: value.totalTime, availableTime: value.availableTime,
     tracks: value.tracks.map(t => ({ no: t.no, name: t.name, bitrate: t.bitrate.trim(),
       protect: t.protect.trim(), time: t.time })) };
+  if (typeof value.rawTitle === 'string') disc.rawTitle = value.rawTitle;
+  if (disc.groupCount > 1) {
+    const info = readGroups(value.rawTitle, disc.tracks.length, disc.groupCount);
+    disc.groups = info.groups;
+    disc.groupedTitle = info.title;
+    disc.groupsEditable = info.editable;
+    disc.groupsNote = info.reason;
+  } else {
+    disc.groups = [];
+    disc.groupsEditable = true;
+    disc.groupsNote = '';
+  }
   disc.revision = createHash('sha256').update(JSON.stringify(disc)).digest('hex');
   return disc;
 }
