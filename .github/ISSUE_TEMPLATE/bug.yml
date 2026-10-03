@@ -1,0 +1,34 @@
+name: Alpha test result or bug
+description: Report a connection, recording or installation result
+body:
+  - type: input
+    id: environment
+    attributes:
+      label: Distribution and version
+      placeholder: Linux Mint 22.3, x86_64, Cinnamon / X11
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version and package
+      placeholder: 2.0.0-alpha.1, deb / AppImage / portable / connection test
+    validations:
+      required: true
+  - type: input
+    id: recorder
+    attributes:
+      label: Recorder model and disc
+      placeholder: Sony MZ-N910, blank 80-minute disc
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened?
+      description: Include the action, expected result and actual result. Do not retry uncertain writes repeatedly.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostic report
+      description: Attach the saved report. Review titles and file paths before posting publicly.

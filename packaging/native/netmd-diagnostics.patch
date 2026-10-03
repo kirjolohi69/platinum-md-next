@@ -1,0 +1,812 @@
+--- a/libnetmd/common.c
++++ b/libnetmd/common.c
+@@ -26,0 +27,2 @@
++#include <stdint.h>
++#include <time.h>
+@@ -38,0 +41,16 @@
++static uint64_t monotonic_ms(void)
++{
++    struct timespec now;
++    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) return 0;
++    return (uint64_t)now.tv_sec * 1000 + (uint64_t)now.tv_nsec / 1000000;
++}
++
++static unsigned int remaining_ms(uint64_t deadline, unsigned int maximum)
++{
++    if (!deadline) return maximum;
++    uint64_t now = monotonic_ms();
++    if (!now || now >= deadline) return 0;
++    uint64_t remaining = deadline - now;
++    return remaining < maximum ? (unsigned int)remaining : maximum;
++}
++
+@@ -47 +65,2 @@
+-static int netmd_poll(libusb_device_handle *dev, unsigned char *buf, int tries)
++static int netmd_poll(libusb_device_handle *dev, unsigned char *buf, int tries,
++                      unsigned int transfer_timeout, uint64_t deadline)
+@@ -57,0 +77 @@
++    int transferred;
+@@ -63 +83,7 @@
+-        if (libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR |
++        unsigned int timeout = remaining_ms(deadline, transfer_timeout);
++        if (!timeout) {
++            netmd_log(NETMD_LOG_ERROR, "netmd_poll: response deadline expired\n");
++            return NETMDERR_TIMEOUT;
++        }
++
++        transferred = libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR |
+@@ -65,2 +91,4 @@
+-                            NETMD_POLL_TIMEOUT) < 0) {
+-            netmd_log(NETMD_LOG_ERROR, "netmd_poll: libusb_control_transfer failed\n");
++                            timeout);
++        if (transferred != 4) {
++            netmd_log(NETMD_LOG_ERROR, "netmd_poll: USB poll returned %d (%s); expected 4 bytes\n",
++                      transferred, transferred < 0 ? libusb_error_name(transferred) : "short reply");
+@@ -75 +103 @@
+-            msleep(sleepytime);
++            msleep(remaining_ms(deadline, sleepytime));
+@@ -91 +119,2 @@
+-    netmd_send_message(devh, cmd, cmdlen);
++    len = netmd_send_message(devh, cmd, cmdlen);
++    if (len < 0) return len;
+@@ -92,0 +122 @@
++    if (len <= 0) return len;
+@@ -97,0 +128 @@
++      if (len <= 0) return len;
+@@ -115 +146 @@
+-    len = netmd_poll(dev, pollbuf, 1);
++    len = netmd_poll(dev, pollbuf, 1, NETMD_POLL_TIMEOUT, 0);
+@@ -117 +148,2 @@
+-        netmd_log(NETMD_LOG_ERROR, "netmd_exch_message: netmd_poll failed\n");
++        netmd_log(NETMD_LOG_ERROR, "netmd_send_message: cannot send, poll result %d%s\n",
++                  len, len > 0 ? " (unread response pending)" : " (transport error)");
+@@ -124 +156 @@
+-    if (libusb_control_transfer(dev, LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR |
++    len = libusb_control_transfer(dev, LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_VENDOR |
+@@ -126,2 +158,4 @@
+-                        NETMD_SEND_TIMEOUT) < 0) {
+-        netmd_log(NETMD_LOG_ERROR, "netmd_exch_message: libusb_control_transfer failed\n");
++                        NETMD_SEND_TIMEOUT);
++    if (len != (int)cmdlen) {
++        netmd_log(NETMD_LOG_ERROR, "netmd_send_message: USB send returned %d (%s); expected %zu bytes\n",
++                  len, len < 0 ? libusb_error_name(len) : "short write", cmdlen);
+@@ -134 +168,2 @@
+-int netmd_recv_message(netmd_dev_handle *devh, unsigned char* rsp)
++static int recv_message(netmd_dev_handle *devh, unsigned char* rsp,
++                         unsigned int transfer_timeout, uint64_t deadline)
+@@ -143 +178 @@
+-    len = netmd_poll(dev, pollbuf, NETMD_RECV_TRIES);
++    len = netmd_poll(dev, pollbuf, NETMD_RECV_TRIES, transfer_timeout, deadline);
+@@ -150 +185,6 @@
+-    if (libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR |
++    unsigned int timeout = remaining_ms(deadline, transfer_timeout);
++    if (!timeout) {
++        netmd_log(NETMD_LOG_ERROR, "netmd_recv_message: response deadline expired before reply read\n");
++        return NETMDERR_TIMEOUT;
++    }
++    int received = libusb_control_transfer(dev, LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_VENDOR |
+@@ -152,2 +192,4 @@
+-                        NETMD_RECV_TIMEOUT) < 0) {
+-        netmd_log(NETMD_LOG_ERROR, "netmd_exch_message: libusb_control_transfer failed\n");
++                        timeout);
++    if (received != len) {
++        netmd_log(NETMD_LOG_ERROR, "netmd_recv_message: USB receive returned %d (%s); expected %d bytes\n",
++                  received, received < 0 ? libusb_error_name(received) : "short reply", len);
+@@ -161,0 +204,13 @@
++}
++
++int netmd_recv_message(netmd_dev_handle *devh, unsigned char *rsp)
++{
++    return recv_message(devh, rsp, NETMD_RECV_TIMEOUT, 0);
++}
++
++int netmd_recv_message_timeout(netmd_dev_handle *devh, unsigned char *rsp,
++                               unsigned int timeout_ms)
++{
++    uint64_t start = monotonic_ms();
++    if (!start || !timeout_ms) return NETMDERR_TIMEOUT;
++    return recv_message(devh, rsp, timeout_ms, start + timeout_ms);
+--- a/libnetmd/common.h
++++ b/libnetmd/common.h
+@@ -42,0 +43,5 @@
++/* Receive one response within an overall deadline. Intended for slow session
++ * transitions; does not send or retry the command that produced the reply. */
++int netmd_recv_message_timeout(netmd_dev_handle *dev, unsigned char *rsp,
++                               unsigned int timeout_ms);
++
+--- a/libnetmd/error.c
++++ b/libnetmd/error.c
+@@ -36 +36,7 @@
+-    {NETMD_USB_ERROR, "Generic USB error"},
++    {NETMD_USB_ERROR, "USB transport failed; see the preceding USB diagnostic"},
++    {NETMD_ERROR, "NetMD operation failed"},
++    {NETMD_RECORDING_COMMITTED_CLEANUP_FAILED, "Track committed, but session cleanup failed; do not resend"},
++    {NETMD_COMMAND_FAILED_NO_RESPONSE, "No response from the recorder"},
++    {NETMD_COMMAND_FAILED_NOT_IMPLEMENTED, "Command not implemented by the recorder"},
++    {NETMD_COMMAND_FAILED_REJECTED, "Command rejected by the recorder"},
++    {NETMD_COMMAND_FAILED_UNKNOWN_ERROR, "Unexpected recorder response status"},
+--- a/libnetmd/error.h
++++ b/libnetmd/error.h
+@@ -29 +29,2 @@
+-    NETMD_USE_HOTPLUG
++    NETMD_USE_HOTPLUG,
++    NETMD_RECORDING_COMMITTED_CLEANUP_FAILED
+--- a/libnetmd/libnetmd.c
++++ b/libnetmd/libnetmd.c
+@@ -103 +103 @@
+-        return 0;
++        return -1;
+@@ -105,0 +106,8 @@
++    if (ret > 0 && title[0] == NETMD_STATUS_REJECTED) {
++        netmd_log(NETMD_LOG_VERBOSE, "Disc title is not available\n");
++        return NETMDERR_CMD_INVALID;
++    }
++    if (ret == 0 || (title[0] != NETMD_STATUS_ACCEPTED && title[0] != NETMD_STATUS_IMPLEMENTED)) {
++        netmd_log(NETMD_LOG_ERROR, "Disc title request was not accepted\n");
++        return -1;
++    }
+@@ -108 +116 @@
+-    if(title_size == 0 || title_size == 0x13)
++    if(title_size < 25 || size == 0)
+@@ -113 +121,2 @@
+-        printf("request_disc_title: title too large for buffer\n");
++        fprintf(stderr, "request_disc_title: title too large for buffer\n");
++        return -1;
+@@ -140 +149 @@
+-    if(ret < 0)
++    if(ret < 31)
+@@ -232 +241 @@
+-static unsigned int get_group_count(netmd_dev_handle* devh)
++static unsigned int get_group_count(const char *header, size_t title_length)
+@@ -234,2 +243 @@
+-    char title[256];
+-    int title_length;
++    char title[256] = {0};
+@@ -240 +248,2 @@
+-    title_length = request_disc_title(devh, title, 256);
++    if (title_length >= sizeof(title)) return 0;
++    memcpy(title, header, title_length);
+@@ -245 +254 @@
+-    while (delim < (title + title_length))
++    while (group <= (title + title_length))
+@@ -315 +324 @@
+-    char disc[256];
++    char disc[256] = {0};
+@@ -317,10 +326,11 @@
+-    md->group_count = get_group_count(devh);
+-
+-    /* You always have at least one group, the disc title */
+-    if(md->group_count == 0)
+-        md->group_count++;
+-
+-    md->groups = malloc(sizeof(struct netmd_group) * md->group_count);
+-    memset(md->groups, 0, sizeof(struct netmd_group) * md->group_count);
+-
+-    disc_size = request_disc_title(devh, disc, 256);
++    md->groups = NULL;
++    md->group_count = 0;
++    md->header_length = 0;
++    /* Size and parse from the same validated response. A failed query must
++     * never turn a grouped disc into an apparent empty/ungrouped disc. */
++    disc_size = request_disc_title(devh, disc, sizeof(disc));
++    if (disc_size < 0) return disc_size;
++    md->group_count = get_group_count(disc, (size_t)disc_size);
++    if (md->group_count == 0) return -1;
++    md->groups = calloc(md->group_count, sizeof(struct netmd_group));
++    if (md->groups == NULL) { md->group_count = 0; return -1; }
+@@ -352 +362 @@
+-    while (delim < (title + title_length))
++    while (group <= (title + title_length))
+@@ -1195,5 +1205,5 @@
+-    if (reply[0] == NETMD_STATUS_ACCEPTED){
+-      return NETMD_NO_ERROR;
+-    } else {
+-      return NETMD_COMMAND_FAILED_UNKNOWN_ERROR;
+-    }
++    if (ret <= 0) return NETMD_USB_ERROR;
++    if (reply[0] == NETMD_STATUS_ACCEPTED) return NETMD_NO_ERROR;
++    if (reply[0] == NETMD_STATUS_NOT_IMPLEMENTED) return NETMD_COMMAND_FAILED_NOT_IMPLEMENTED;
++    if (reply[0] == NETMD_STATUS_REJECTED) return NETMD_COMMAND_FAILED_REJECTED;
++    return NETMD_RESPONSE_NOT_EXPECTED;
+@@ -1210 +1220,5 @@
+-    return ret;
++    if (ret <= 0) return NETMD_USB_ERROR;
++    if (reply[0] == NETMD_STATUS_ACCEPTED) return NETMD_NO_ERROR;
++    if (reply[0] == NETMD_STATUS_NOT_IMPLEMENTED) return NETMD_COMMAND_FAILED_NOT_IMPLEMENTED;
++    if (reply[0] == NETMD_STATUS_REJECTED) return NETMD_COMMAND_FAILED_REJECTED;
++    return NETMD_RESPONSE_NOT_EXPECTED;
+--- a/libnetmd/libnetmd_extended.h
++++ b/libnetmd/libnetmd_extended.h
+@@ -17 +17 @@
+-void netmd_send_secure_msg(netmd_dev_handle *dev, unsigned char cmd, unsigned char *data, size_t data_size);
++netmd_error netmd_send_secure_msg(netmd_dev_handle *dev, unsigned char cmd, unsigned char *data, size_t data_size);
+--- a/libnetmd/log.c
++++ b/libnetmd/log.c
+@@ -50 +50 @@
+-        printf("%02x ", buf[i] & 0xff);
++        fprintf(stderr, "%02x ", buf[i] & 0xff);
+@@ -54 +54 @@
+-            printf("\t\t");
++            fprintf(stderr, "\t\t");
+@@ -58 +58 @@
+-                    printf(".");
++                    fprintf(stderr, ".");
+@@ -60 +60 @@
+-                    printf("%c", buf[j]);
++                    fprintf(stderr, "%c", buf[j]);
+@@ -62 +62 @@
+-            printf("\n");
++            fprintf(stderr, "\n");
+@@ -69 +69 @@
+-        printf("\n");
++        fprintf(stderr, "\n");
+@@ -75 +75 @@
+-        printf("   ");
++        fprintf(stderr, "   ");
+@@ -77 +77 @@
+-    printf("\t\t");
++    fprintf(stderr, "\t\t");
+@@ -82 +82 @@
+-            printf(".");
++            fprintf(stderr, ".");
+@@ -84 +84 @@
+-            printf("%c", buf[j]);
++            fprintf(stderr, "%c", buf[j]);
+@@ -86 +86 @@
+-    printf("\n");
++    fprintf(stderr, "\n");
+@@ -99 +99 @@
+-    vprintf(fmt, arg);
++    vfprintf(stderr, fmt, arg);
+@@ -101 +101 @@
+-    fflush(stdout);
++    fflush(stderr);
+--- a/libnetmd/netmd_dev.c
++++ b/libnetmd/netmd_dev.c
+@@ -51 +51,5 @@
+-    libusb_init(&ctx);
++    int init_result = libusb_init(&ctx);
++    if (init_result < 0) {
++        netmd_log(NETMD_LOG_ERROR, "libusb_init: %s\n", libusb_error_name(init_result));
++        return NETMD_USB_ERROR;
++    }
+@@ -82 +86,2 @@
+-    if (result == 0)
++    netmd_log(NETMD_LOG_VERBOSE, "libusb_open: %s (%d)\n", libusb_error_name(result), result);
++    if (result == 0) {
+@@ -83,0 +89,2 @@
++        netmd_log(NETMD_LOG_VERBOSE, "libusb_claim_interface: %s (%d)\n", libusb_error_name(result), result);
++    }
+@@ -89,0 +97 @@
++        if (dh != NULL) libusb_close(dh);
+@@ -101 +109 @@
+-        netmd_log(NETMD_LOG_ERROR, "libusb_get_string_descriptor_asci failed, %s (%d)\n", strerror(errno), errno);
++        netmd_log(NETMD_LOG_ERROR, "libusb_get_string_descriptor_asci failed, %s (%d)\n", libusb_error_name(result), result);
+--- a/libnetmd/playercontrol.c
++++ b/libnetmd/playercontrol.c
+@@ -25,0 +26 @@
++#include "log.h"
+@@ -27,0 +29,90 @@
++#include <stdio.h>
++#include <string.h>
++
++static netmd_error status_reply(const unsigned char* reply, int length)
++{
++    if (length < 0) return NETMD_USB_ERROR;
++    if (length < 1) return NETMD_RESPONSE_TO_SHORT;
++    if (reply[0] != NETMD_STATUS_ACCEPTED && reply[0] != NETMD_STATUS_IMPLEMENTED)
++        return NETMD_RESPONSE_NOT_EXPECTED;
++    return NETMD_NO_ERROR;
++}
++
++static void log_presence_reply(const char* stage, const unsigned char* reply, int length)
++{
++    /* Only this small read-only status exchange is logged, never disc titles
++     * or audio. One bounded line preserves the reply before descriptor close. */
++    char hex[64 * 3 + 1] = {0};
++    int shown = length < 64 ? length : 64;
++    for (int i = 0; i < shown; i++) snprintf(hex + i * 3, 4, "%02x ", reply[i]);
++    if (shown > 0) hex[shown * 3 - 1] = '\0';
++    netmd_log(NETMD_LOG_VERBOSE, "disc presence %s: %d bytes [%s]%s\n",
++              stage, length, hex, length > 64 ? " (first 64 bytes)" : "");
++}
++
++static netmd_error presence_descriptor_reply(const unsigned char* reply, int length)
++{
++    /* netmd-js treats descriptor housekeeping as best effort. An explicit
++     * rejection/unsupported response is safe to tolerate ONLY because a
++     * separately validated status reply decides presence. Never ignore a
++     * failed transport or an empty/malformed reply. */
++    if (length > 0 && (reply[0] == NETMD_STATUS_REJECTED ||
++                       reply[0] == NETMD_STATUS_NOT_IMPLEMENTED)) {
++        netmd_log(NETMD_LOG_VERBOSE,
++                  "disc presence descriptor declined (0x%02x); using the status response\n", reply[0]);
++        return NETMD_NO_ERROR;
++    }
++    return status_reply(reply, length);
++}
++
++netmd_error netmd_get_disc_presence(netmd_dev_handle* dev, int* present)
++{
++    /* netmd-js getStatus/isDiscPresent: open the operating-status descriptor,
++     * read its length-prefixed data, then close it. Payload byte 4 is 0x40
++     * when a disc is present; all other values mean not present. This only
++     * classifies media after the complete status reply has been validated. */
++    unsigned char descriptor[] = {0x00, 0x18, 0x08, 0x80, 0x00, 0x01, 0x00};
++    unsigned char request[] = {0x00, 0x18, 0x09, 0x80, 0x01, 0x02, 0x30, 0x88,
++        0x00, 0x00, 0x30, 0x88, 0x04, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00};
++    const unsigned char prefix[] = {0x18, 0x09, 0x80, 0x01, 0x02, 0x30, 0x88,
++        0x00, 0x00, 0x30, 0x88, 0x04, 0x00, 0x10, 0x00, 0x00, 0x09, 0x00, 0x00};
++    unsigned char reply[255] = {0};
++    int length = netmd_exch_message(dev, descriptor, sizeof(descriptor), reply);
++    log_presence_reply("open", reply, length);
++    netmd_error error = presence_descriptor_reply(reply, length);
++    if (error != NETMD_NO_ERROR) return error;
++
++    memset(reply, 0, sizeof(reply));
++    length = netmd_exch_message(dev, request, sizeof(request), reply);
++    log_presence_reply("status", reply, length);
++    if (length < 0) return NETMD_USB_ERROR; /* Do not send more on a failed USB exchange. */
++    error = status_reply(reply, length);
++    int candidate = -1;
++    if (error == NETMD_NO_ERROR) {
++        if (length < 27) {
++            netmd_log(NETMD_LOG_VERBOSE, "disc presence status is too short (minimum 27 bytes)\n");
++            error = NETMD_RESPONSE_TO_SHORT;
++        } else if (memcmp(reply + 1, prefix, sizeof(prefix)) != 0) {
++            netmd_log(NETMD_LOG_VERBOSE, "disc presence status header does not match\n");
++            error = NETMD_RESPONSE_NOT_EXPECTED;
++        } else if (((unsigned int)reply[20] * 256 + reply[21]) != (unsigned int)(length - 22)) {
++            netmd_log(NETMD_LOG_VERBOSE, "disc presence payload length mismatch: declared %u, received %d\n",
++                      (unsigned int)reply[20] * 256 + reply[21], length - 22);
++            error = NETMD_RESPONSE_NOT_EXPECTED;
++        } else {
++            candidate = reply[26] == 0x40;
++            netmd_log(NETMD_LOG_VERBOSE, "disc presence flag: 0x%02x (%s)\n",
++                      reply[26], candidate ? "present" : "not present");
++        }
++    }
++    descriptor[5] = 0x00;
++    memset(reply, 0, sizeof(reply));
++    length = netmd_exch_message(dev, descriptor, sizeof(descriptor), reply);
++    log_presence_reply("close", reply, length);
++    netmd_error close_error = presence_descriptor_reply(reply, length);
++    if (error != NETMD_NO_ERROR) return error;
++    if (close_error != NETMD_NO_ERROR) return close_error;
++    *present = candidate;
++    netmd_log(NETMD_LOG_VERBOSE, "disc present: %s\n", candidate ? "yes" : "no");
++    return NETMD_NO_ERROR;
++}
+@@ -216 +307 @@
+-    unsigned char buf[255];
++    unsigned char buf[255] = {0};
+@@ -218,3 +309,25 @@
+-    /* TODO: error checking */
+-    netmd_exch_message(dev, hs, sizeof(hs), buf);
+-    netmd_exch_message(dev, request, sizeof(request), buf);
++    int length = netmd_exch_message(dev, hs, sizeof(hs), buf);
++    netmd_log(NETMD_LOG_VERBOSE, "capacity handshake response: %d bytes\n", length);
++    if (length <= 0) {
++        netmd_log(NETMD_LOG_ERROR, "Disc capacity handshake failed: result %d\n", length);
++        return NETMD_USB_ERROR;
++    }
++
++    memset(buf, 0, sizeof(buf));
++    length = netmd_exch_message(dev, request, sizeof(request), buf);
++    /* A 25-byte header followed by three (2-byte size + 5-byte BCD time)
++       records is 46 bytes, not 48. See netmd/libnetmd.py:getDiscCapacity
++       and libnetmd/utilities/logparse.pl:DecodeDiscCapacityReply. */
++    netmd_log(NETMD_LOG_VERBOSE, "disc capacity response: %d bytes (minimum 46)\n", length);
++    if (length < 46) {
++        netmd_log(NETMD_LOG_ERROR, "Incomplete disc capacity response: got %d bytes, need 46\n", length);
++        if (length > 0) netmd_log_hex(NETMD_LOG_ERROR, buf, (size_t)length);
++        return length < 0 ? NETMD_USB_ERROR : NETMD_RESPONSE_TO_SHORT;
++    }
++    if ((buf[0] != NETMD_STATUS_ACCEPTED && buf[0] != NETMD_STATUS_IMPLEMENTED) ||
++        buf[25] != 0 || buf[26] != 5 || buf[32] != 0 || buf[33] != 5 ||
++        buf[39] != 0 || buf[40] != 5) {
++        netmd_log(NETMD_LOG_ERROR, "Unexpected disc capacity response layout or status\n");
++        netmd_log_hex(NETMD_LOG_ERROR, buf, (size_t)length);
++        return NETMD_RESPONSE_NOT_EXPECTED;
++    }
+--- a/libnetmd/playercontrol.h
++++ b/libnetmd/playercontrol.h
+@@ -7,0 +8,3 @@
++/* Read-only presence check. Unknown/malformed replies are errors, not absence. */
++netmd_error netmd_get_disc_presence(netmd_dev_handle* dev, int* present);
++
+--- a/libnetmd/secure.c
++++ b/libnetmd/secure.c
+@@ -61 +61 @@
+-    memcpy(request + header_length + 2, data, data_size);
++    if (data_size) memcpy(request + header_length + 2, data, data_size);
+@@ -96 +96 @@
+-void netmd_send_secure_msg(netmd_dev_handle *dev, unsigned char cmd,
++netmd_error netmd_send_secure_msg(netmd_dev_handle *dev, unsigned char cmd,
+@@ -104,0 +105 @@
++    if (request == NULL) return NETMD_ERROR;
+@@ -109 +110 @@
+-    netmd_send_message(dev, request, request_length);
++    int sent = netmd_send_message(dev, request, request_length);
+@@ -113,0 +115 @@
++    return sent < 0 ? NETMD_USB_ERROR : NETMD_NO_ERROR;
+@@ -123,5 +125,11 @@
+-    response->length = (size_t)netmd_recv_message(dev, response->content);
+-    response->position = 0;
+-
+-    if (response->length < 1) {
+-        return NETMD_COMMAND_FAILED_NO_RESPONSE;
++    memset(response, 0, sizeof(*response));
++    /* The MZ-N910 can stall a poll while closing a secure session. Alpha.3
++     * reports show successful closes taking 4-5 seconds and failed polls
++     * hitting the old 1-second USB timeout. Bound this response to 20 seconds
++     * including polling and the reply read. Never resend the close command. */
++    int received = cmd == 0x81
++        ? netmd_recv_message_timeout(dev, response->content, 20000)
++        : netmd_recv_message(dev, response->content);
++    if (received <= 0) {
++        memset(response->content, 0, sizeof(response->content));
++        return received < 0 ? NETMD_USB_ERROR : NETMD_COMMAND_FAILED_NO_RESPONSE;
+@@ -128,0 +137,2 @@
++    if ((size_t)received > sizeof(response->content)) return NETMD_RESPONSE_NOT_EXPECTED;
++    response->length = (size_t)received;
+@@ -156 +166,3 @@
+-    netmd_send_secure_msg(dev, cmd, data, data_size);
++    memset(response, 0, sizeof(*response));
++    rsp = netmd_send_secure_msg(dev, cmd, data, data_size);
++    if (rsp != NETMD_NO_ERROR) return rsp;
+@@ -182,0 +195 @@
++    netmd_log(NETMD_LOG_VERBOSE, "stage: close secure session; response budget 20000 ms\n");
+@@ -363 +376 @@
+-void netmd_transfer_song_packets(netmd_dev_handle *dev,
++netmd_error netmd_transfer_song_packets(netmd_dev_handle *dev,
+@@ -370 +383 @@
+-    int error;
++    int error = LIBUSB_SUCCESS;
+@@ -383,0 +397 @@
++        if (packet == NULL) return NETMD_ERROR;
+@@ -397,0 +412 @@
++        transferred = 0;
+@@ -399 +414 @@
+-        total_transferred += (size_t) transferred;
++        if (transferred > 0) total_transferred += (size_t)transferred;
+@@ -401 +416 @@
+-        if (error != LIBUSB_SUCCESS)
++        if (error != LIBUSB_SUCCESS || transferred != (int)packet_size)
+@@ -412 +427 @@
+-        if (error >= 0) {
++        if (error == LIBUSB_SUCCESS && transferred == (int)packet_size) {
+@@ -417 +432 @@
+-            break;
++            return NETMD_USB_ERROR; /* Never resend a partially written packet. */
+@@ -425,0 +441 @@
++    return NETMD_NO_ERROR;
+@@ -559,0 +576 @@
++    *packets = NULL;
+@@ -597 +614,2 @@
+-    netmd_send_secure_msg(dev, 0x28, cmd, sizeof(cmd));
++    error = netmd_send_secure_msg(dev, 0x28, cmd, sizeof(cmd));
++    if (error != NETMD_NO_ERROR) return error;
+@@ -604 +622,2 @@
+-        netmd_transfer_song_packets(dev, packets, packet_length);
++        error = netmd_transfer_song_packets(dev, packets, packet_length);
++        if (error != NETMD_NO_ERROR) return error;
+@@ -607,0 +627,2 @@
++        if (error != NETMD_NO_ERROR) return error;
++        if (response.length - response.position < 2) return NETMD_RESPONSE_TO_SHORT;
+@@ -782 +803,2 @@
+-    netmd_send_secure_msg(dev, 0x30, cmd, sizeof(cmd));
++    error = netmd_send_secure_msg(dev, 0x30, cmd, sizeof(cmd));
++    if (error != NETMD_NO_ERROR) return error;
+@@ -838 +860 @@
+-    netmd_wait_for_sync(dev);
++    if (!netmd_wait_for_sync(dev)) return NETMD_USB_ERROR;
+@@ -844,2 +866 @@
+-    netmd_wait_for_sync(dev);
+-    
++    if (error == NETMD_NO_ERROR && !netmd_wait_for_sync(dev)) return NETMD_RECORDING_COMMITTED_CLEANUP_FAILED;
+--- a/libnetmd/send.c
++++ b/libnetmd/send.c
+@@ -133 +133 @@
+-    netmd_error error;
++    netmd_error error = NETMD_NO_ERROR;
+@@ -134,0 +135,2 @@
++    int acquired = 0, session_open = 0, key_known = 0, committed = 0;
++    const char *stage = "input validation";
+@@ -148,2 +149,0 @@
+-    netmd_keychain *keychain;
+-    netmd_keychain *next;
+@@ -181 +181,4 @@
+-    stat(filename, &stat_buf);
++    if (stat(filename, &stat_buf) != 0 || stat_buf.st_size < 0) {
++        netmd_log(NETMD_LOG_ERROR, "Cannot stat input audio file\n");
++        return NETMD_ERROR;
++    }
+@@ -208 +211 @@
+-
++        fclose(f);
+@@ -231,0 +235 @@
++            if (audio_data_position > data_size) { free(data); return NETMD_ERROR; }
+@@ -232,0 +237,5 @@
++            if (audio_data_size == 0 || audio_data_size > data_size - audio_data_position ||
++                (need_conversion && audio_data_size % 2 != 0)) {
++                netmd_log(NETMD_LOG_ERROR, "Invalid audio data chunk length\n");
++                free(data); return NETMD_ERROR;
++            }
+@@ -239 +248,3 @@
+-    /* acquire device - needed by Sharp devices, may fail on Sony devices */
++    stage = "device readiness";
++    if (!netmd_wait_for_sync(devh)) { error = NETMD_USB_ERROR; goto finish; }
++    stage = "device acquisition";
+@@ -241,0 +253,2 @@
++    if (error == NETMD_NO_ERROR) acquired = 1;
++    else if (error != NETMD_COMMAND_FAILED_NOT_IMPLEMENTED && error != NETMD_COMMAND_FAILED_REJECTED) goto finish;
+@@ -242,0 +256,2 @@
++    stage = "clear previous secure session";
++    if (!netmd_wait_for_sync(devh)) { error = NETMD_USB_ERROR; goto finish; }
+@@ -244,0 +260,2 @@
++    if (error != NETMD_NO_ERROR) goto finish;
++    if (!netmd_wait_for_sync(devh)) { error = NETMD_USB_ERROR; goto finish; }
+@@ -245,0 +263 @@
++    stage = "track protection setup";
+@@ -247,0 +266 @@
++    if (error != NETMD_NO_ERROR) goto finish;
+@@ -248,0 +268 @@
++    stage = "secure session entry";
+@@ -250,0 +271,2 @@
++    if (error != NETMD_NO_ERROR) goto finish;
++    session_open = 1;
+@@ -255,20 +277,5 @@
+-    ekb.signature = malloc(sizeof(signature));
+-    memcpy(ekb.signature, signature, sizeof(signature));
+-
+-    /* build ekb key chain */
+-    ekb.chain = NULL;
+-    for (done = 0; done < sizeof(chain); done += 16U)
+-    {
+-        next = malloc(sizeof(netmd_keychain));
+-        if (ekb.chain == NULL) {
+-            ekb.chain = next;
+-        }
+-        else {
+-            keychain->next = next;
+-        }
+-        next->next = NULL;
+-
+-        next->key = malloc(16);
+-        memcpy(next->key, chain + done, 16);
+-
+-        keychain = next;
++    ekb.signature = (char *)signature;
++    netmd_keychain entries[sizeof(chain) / 16];
++    for (done = 0; done < sizeof(entries) / sizeof(entries[0]); done++) {
++        entries[done].key = (char *)chain + done * 16;
++        entries[done].next = done + 1 < sizeof(entries) / sizeof(entries[0]) ? &entries[done + 1] : NULL;
+@@ -276 +283,2 @@
+-
++    ekb.chain = entries;
++    stage = "key data transfer";
+@@ -279,10 +287 @@
+-
+-    /* cleanup */
+-    free(ekb.signature);
+-    keychain = ekb.chain;
+-    while (keychain != NULL) {
+-        next = keychain->next;
+-        free(keychain->key);
+-        free(keychain);
+-        keychain = next;
+-    }
++    if (error != NETMD_NO_ERROR) goto finish;
+@@ -291,0 +291 @@
++    stage = "session key exchange";
+@@ -293,0 +294,2 @@
++    if (error != NETMD_NO_ERROR) goto finish;
++    key_known = 1;
+@@ -297,0 +300 @@
++    stage = "download setup";
+@@ -299,0 +303 @@
++    if (error != NETMD_NO_ERROR) goto finish;
+@@ -312,0 +317 @@
++    stage = "audio packet preparation";
+@@ -314,0 +320 @@
++    if (error != NETMD_NO_ERROR) goto finish;
+@@ -316,0 +323 @@
++    stage = "audio transfer";
+@@ -326,0 +334 @@
++    data = NULL;
+@@ -350,3 +358,5 @@
+-        netmd_cache_toc(devh);
+-        netmd_set_title(devh, track, titlep);
+-        netmd_sync_toc(devh);
++        stage = "recorded track title";
++        if (netmd_cache_toc(devh) <= 0) { error = NETMD_USB_ERROR; goto finish; }
++        int title_result = netmd_set_title(devh, track, titlep);
++        if (!title_result) { error = NETMD_USB_ERROR; goto finish; }
++        if (netmd_sync_toc(devh) <= 0) { error = NETMD_USB_ERROR; goto finish; }
+@@ -354,0 +365 @@
++        stage = "track commit";
+@@ -355,0 +367 @@
++        committed = error == NETMD_NO_ERROR || error == NETMD_RECORDING_COMMITTED_CLEANUP_FAILED;
+@@ -365,13 +377,31 @@
+-    /* forget key */
+-    netmd_error cleanup_error = netmd_secure_session_key_forget(devh);
+-    netmd_log(NETMD_LOG_VERBOSE, "netmd_secure_session_key_forget : %s\n", netmd_strerror(cleanup_error));
+-
+-    /* leave session */
+-    cleanup_error = netmd_secure_leave_session(devh);
+-    netmd_log(NETMD_LOG_VERBOSE, "netmd_secure_leave_session : %s\n", netmd_strerror(cleanup_error));
+-
+-    /* release device - needed by Sharp devices, may fail on Sony devices */
+-    cleanup_error = netmd_release_dev(devh);
+-    netmd_log(NETMD_LOG_VERBOSE, "netmd_release_dev : %s\n", netmd_strerror(cleanup_error));
+-
+-    return error; /* return error code from the "business logic" */
++finish:
++    netmd_cleanup_packets(&packets);
++    free(data);
++    if (error != NETMD_NO_ERROR) {
++        netmd_log(NETMD_LOG_ERROR, "Recording stopped at %s: %s. No automatic retry.\n", stage, netmd_strerror(error));
++    }
++    /* A failed transport can leave an unread response. Do not keep sending
++     * commands or parse that response as if it belonged to another request. */
++    if (error == NETMD_USB_ERROR || error == NETMD_RECORDING_COMMITTED_CLEANUP_FAILED) return error;
++    netmd_error cleanup_error = NETMD_NO_ERROR;
++    if (key_known) {
++        if (!netmd_wait_for_sync(devh)) cleanup_error = NETMD_USB_ERROR;
++        else cleanup_error = netmd_secure_session_key_forget(devh);
++        netmd_log(NETMD_LOG_VERBOSE, "netmd_secure_session_key_forget : %s\n", netmd_strerror(cleanup_error));
++    }
++    if (cleanup_error == NETMD_NO_ERROR && session_open) {
++        if (!netmd_wait_for_sync(devh)) cleanup_error = NETMD_USB_ERROR;
++        else cleanup_error = netmd_secure_leave_session(devh);
++        netmd_log(NETMD_LOG_VERBOSE, "netmd_secure_leave_session : %s\n", netmd_strerror(cleanup_error));
++    }
++    if (cleanup_error == NETMD_NO_ERROR && acquired) {
++        if (!netmd_wait_for_sync(devh)) cleanup_error = NETMD_USB_ERROR;
++        else cleanup_error = netmd_release_dev(devh);
++        netmd_log(NETMD_LOG_VERBOSE, "netmd_release_dev : %s\n", netmd_strerror(cleanup_error));
++    }
++    if (cleanup_error != NETMD_NO_ERROR) {
++        netmd_log(NETMD_LOG_ERROR, "Recording session cleanup failed. Reconnect USB before another recording.\n");
++        if (committed) return NETMD_RECORDING_COMMITTED_CLEANUP_FAILED;
++        if (error == NETMD_NO_ERROR) return cleanup_error;
++    }
++    return error;
+--- a/libnetmd/trackinformation.c
++++ b/libnetmd/trackinformation.c
+@@ -92,0 +93 @@
++      return -1;
+@@ -110,0 +112 @@
++    if (ret <= 0 || ret > (int)sizeof(reply)) return -1;
+@@ -137 +139 @@
+-    if(title_size == 0 || title_size == 0x13)
++    if(title_size < 25 || size == 0)
+--- a/netmdcli/netmdcli.c
++++ b/netmdcli/netmdcli.c
+@@ -152,2 +152,2 @@
+-    char buffer[12];
+-    sprintf(buffer, "%02d:%02d:%02d.%02d", time->hour, time->minute, time->second, time->frame);
++    char buffer[32];
++    snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d.%02d", time->hour, time->minute, time->second, time->frame);
+@@ -165 +165 @@
+-    minidisc my_minidisc, *md = &my_minidisc;
++    minidisc my_minidisc = {0}, *md = &my_minidisc;
+@@ -169 +169 @@
+-    char name[16];
++    char name[256];
+@@ -208,0 +209 @@
++    fprintf(stderr, "stage: enumerate USB devices\n");
+@@ -222,0 +224 @@
++    fprintf(stderr, "stage: open %s\n", netmd->model);
+@@ -230 +232,2 @@
+-    error = netmd_get_devname(devh, name, 16);
++    fprintf(stderr, "stage: read USB product name\n");
++    error = netmd_get_devname(devh, name, sizeof(name));
+@@ -233,2 +236 @@
+-        printf("Could not get device name\n%s\n", netmd_strerror(error));
+-        return 1;
++        fprintf(stderr, "USB product name unavailable: %s; using supported model name\n", netmd_strerror(error));
+@@ -237 +239,32 @@
+-    netmd_initialize_disc_info(devh, md);
++    fprintf(stderr, "stage: initialize disc information\n");
++    int disc_result = netmd_initialize_disc_info(devh, md);
++    if (disc_result < 0) {
++        /* A rejected title query alone does not prove there is no disc.
++         * Confirm presence only for read-only listings, never after a USB
++         * transport failure or in place of a failed recording command. */
++        if (argc == 1 && disc_result == NETMDERR_CMD_INVALID) {
++            int present = -1;
++            fprintf(stderr, "stage: check disc presence\n");
++            error = netmd_get_disc_presence(devh, &present);
++            if (error == NETMD_NO_ERROR && !present) {
++                json = json_object_new_object();
++                json_object_object_add(json, "device", json_object_new_string(netmd->model));
++                json_object_object_add(json, "discPresent", json_object_new_boolean(0));
++                puts(json_object_to_json_string(json));
++                json_object_put(json);
++                netmd_close(devh);
++                netmd_clean(&device_list);
++                return 0;
++            }
++            if (error != NETMD_NO_ERROR)
++                fprintf(stderr, "Cannot confirm disc presence: %s\n", netmd_strerror(error));
++        }
++        fprintf(stderr, "Cannot read disc title\n");
++        netmd_close(devh);
++        netmd_clean(&device_list);
++        return 1;
++    }
++    if (md->groups == NULL || md->group_count == 0) {
++        fprintf(stderr, "No readable disc information\n");
++        return 1;
++    }
+@@ -242 +275,2 @@
+-    json_object_object_add(json, "title",   json_object_new_string(md->groups[0].name));
++    json_object_object_add(json, "title", json_object_new_string(md->groups[0].name ? md->groups[0].name : ""));
++    json_object_object_add(json, "groupCount", json_object_new_int(md->group_count));
+@@ -252 +286 @@
+-            netmd_set_title(devh, i & 0xffff, argv[3]);
++            exit_code = netmd_set_title(devh, i & 0xffff, argv[3]) ? 0 : 1;
+@@ -260 +294 @@
+-            netmd_move_track(devh, i & 0xffff, j & 0xffff);
++            exit_code = netmd_move_track(devh, i & 0xffff, j & 0xffff) ? 0 : 1;
+@@ -287 +321 @@
+-            netmd_set_disc_title(devh, argv[2], strlen(argv[2]));
++            exit_code = netmd_set_disc_title(devh, argv[2], strlen(argv[2])) < 0 ? 1 : 0;
+@@ -394 +428,4 @@
+-                    netmd_delete_track(devh, ((uint16_t) track) & 0xffff);
++                    if (netmd_delete_track(devh, ((uint16_t) track) & 0xffff) < 0) {
++                        exit_code = 1;
++                        break;
++                    }
+@@ -444 +481,4 @@
+-            netmd_get_disc_capacity(devh, &capacity);
++            if (netmd_get_disc_capacity(devh, &capacity) != NETMD_NO_ERROR) {
++        fprintf(stderr, "Cannot read disc capacity\n");
++        exit(1);
++    }
+@@ -469 +509,3 @@
+-            exit_code = netmd_send_track(devh, filename, title) == NETMD_NO_ERROR ? 0 : 1;
++            error = netmd_send_track(devh, filename, title);
++            exit_code = error == NETMD_NO_ERROR ? 0 :
++                error == NETMD_RECORDING_COMMITTED_CLEANUP_FAILED ? 2 : 1;
+@@ -509 +551 @@
+-    uint8_t i = 0;
++    unsigned int i = 0;
+@@ -521,2 +563,6 @@
+-    netmd_disc_capacity capacity;
+-    netmd_get_disc_capacity(devh, &capacity);
++    netmd_disc_capacity capacity = {0};
++    fprintf(stderr, "stage: read disc capacity\n");
++    if (netmd_get_disc_capacity(devh, &capacity) != NETMD_NO_ERROR) {
++        fprintf(stderr, "Cannot read disc capacity\n");
++        exit(1);
++    }
+@@ -529 +575 @@
+-    for(i = 0; size >= 0; i++)
++    for(i = 0; size >= 0 && i < 255; i++)
+@@ -530,0 +577,2 @@
++        fprintf(stderr, "stage: read track %u\n", i + 1);
++        memset(buffer, 0, sizeof(buffer));
+@@ -562,3 +610,6 @@
+-        netmd_request_track_time(devh, i, &time);
+-        netmd_request_track_flags(devh, i, &flags);
+-        netmd_request_track_bitrate(devh, i, &bitrate_id, &channel);
++        if (!netmd_request_track_time(devh, i, &time) ||
++            netmd_request_track_flags(devh, i, &flags) < 0 ||
++            netmd_request_track_bitrate(devh, i, &bitrate_id, &channel) < 0) {
++            fprintf(stderr, "Incomplete metadata for track %u\n", i + 1);
++            exit(1);
++        }
+@@ -582,2 +633,2 @@
+-        char time_buf[9];
+-        sprintf(time_buf, "%02i:%02i:%02i", time.minute, time.second, time.tenth);
++        char time_buf[32];
++        snprintf(time_buf, sizeof(time_buf), "%02i:%02i:%02i", time.minute, time.second, time.tenth);
+@@ -596 +647 @@
+-    printf(json_object_to_json_string_ext(json, JSON_C_TO_STRING_PRETTY));
++    printf("%s\n", json_object_to_json_string_ext(json, JSON_C_TO_STRING_PRETTY));
+@@ -601 +652 @@
+-    exit(0);
++    return;

@@ -1,0 +1,64 @@
+appId: org.platinummd.Next
+productName: Platinum-MD Next
+electronVersion: 44.3.0
+asar: true
+npmRebuild: false
+directories:
+  output: release
+files:
+  - app/**/*
+  - dist/ui/**/*
+  - scripts/probe.cjs
+  - static/icons/**/*
+  - LICENSE
+  - THIRD_PARTY_NOTICES.md
+extraResources:
+  - from: native
+    to: native
+  - from: packaging/linux
+    to: linux
+linux:
+  executableName: platinum-md-next
+  syncDesktopName: true
+  icon: build/icons
+  category: AudioVideo
+  synopsis: Manage and record music to a NetMD MiniDisc recorder
+  artifactName: Platinum-MD-Next-${version}-linux-${arch}.${ext}
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: tar.gz
+      arch: [x64]
+deb:
+  maintainer: Platinum-MD Next contributors
+  afterInstall: packaging/linux/after-install.sh
+  afterRemove: packaging/linux/after-remove.sh
+  depends:
+    - libc6 (>= 2.39)
+    - libstdc++6 (>= 13.2)
+    - libgcc-s1
+    - libcups2 | libcups2t64
+    - libudev1
+    - libxkbcommon0
+    - libgtk-3-0 | libgtk-3-0t64
+    - libnss3
+    - libasound2 | libasound2t64
+    - libgbm1
+    - libxss1
+    - libxtst6
+    - libatspi2.0-0 | libatspi2.0-0t64
+    - xdg-utils
+  recommends: []
+flatpak:
+  runtime: org.freedesktop.Platform
+  runtimeVersion: '25.08'
+  sdk: org.freedesktop.Sdk
+  base: org.electronjs.Electron2.BaseApp
+  baseVersion: '25.08'
+  branch: alpha
+  useWaylandFlags: true
+  finishArgs:
+    - --share=ipc
+    - --socket=fallback-x11
+    - --socket=wayland
+    - --device=all

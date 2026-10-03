@@ -1,0 +1,42 @@
+{
+  "name": "platinum-md-next",
+  "version": "1.0.1",
+  "private": true,
+  "description": "A modern Linux desktop for NetMD MiniDisc recorders",
+  "author": "Platinum-MD Next contributors",
+  "license": "MIT",
+  "main": "app/main.cjs",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "scripts": {
+    "dev": "npm run build && electron .",
+    "build": "vite build",
+    "test": "node --test test/modern/*.test.cjs",
+    "probe": "node scripts/probe.cjs",
+    "native": "bash scripts/build-native.sh",
+    "package:linux": "npm run package:deb",
+    "package:portable": "npm run package:dir && python3 scripts/package-portable.py",
+    "test:portable": "python3 scripts/test-portable.py",
+    "package:dir": "npm run build && node scripts/check-native.cjs && electron-builder --linux dir --publish never",
+    "package:probe": "python3 scripts/package-probe.py",
+    "package:flatpak": "npm run build && node scripts/check-native.cjs && electron-builder --linux flatpak --publish never",
+    "test:audio": "python3 scripts/test-audio.py",
+    "package:deb": "npm run package:dir && python3 scripts/package-deb.py",
+    "test:native": "bash scripts/test-native.sh",
+    "test:deb": "python3 scripts/test-deb.py"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.8",
+    "electron": "44.3.0",
+    "electron-builder": "26.15.3",
+    "vite": "8.3.0",
+    "vue": "3.5.42"
+  },
+  "homepage": "https://github.com/gavinbenda/platinum-md",
+  "productName": "Platinum-MD Next",
+  "desktopName": "platinum-md-next.desktop",
+  "musicbrainzContact": "",
+  "debianEpoch": 1,
+  "releaseNotes": "docs/RELEASE_1_0_1.md"
+}

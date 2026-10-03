@@ -1,0 +1,25 @@
+{
+  "source": "https://github.com/metabrainz/musicbrainz-server/blob/master/lib/MusicBrainz/Server/Controller/WS/2/DiscID.pm",
+  "sourceBlobSha": "fda61f5238a0c48187777f9534848e5fa996e9df",
+  "checked": "2026-09-23",
+  "allowedIncludes": [
+    "artists",
+    "labels",
+    "recordings",
+    "release-groups",
+    "artist-credits",
+    "tags",
+    "user-tags",
+    "genres",
+    "user-genres",
+    "aliases",
+    "puids",
+    "isrcs",
+    "_relations",
+    "cdstubs"
+  ],
+  "automaticIncludes": [
+    "media",
+    "discids"
+  ]
+}
