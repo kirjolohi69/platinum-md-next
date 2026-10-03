@@ -18,8 +18,11 @@ import zipfile
 
 
 def digest(path):
+    value = hashlib.sha256()
     with path.open('rb') as source:
-        return hashlib.file_digest(source, 'sha256').hexdigest()
+        for chunk in iter(lambda: source.read(1024 * 1024), b''):
+            value.update(chunk)
+    return value.hexdigest()
 
 
 def local_name(value):

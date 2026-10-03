@@ -35,8 +35,16 @@ check('app'); check('dist/ui'); check('static/icons');
 
 
 def digest(file):
+    return file_hash(file, 'sha256')
+
+
+def file_hash(file, algorithm):
+    # hashlib.file_digest needs Python 3.11; Ubuntu 22.04 has 3.10.
+    value = hashlib.new(algorithm)
     with file.open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            value.update(chunk)
+    return value.hexdigest()
 
 
 def validate_native(app):

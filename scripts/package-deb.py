@@ -11,7 +11,7 @@ import os
 import shutil
 import subprocess
 import tempfile
-from package_support import digest, validate_app, verified_commit
+from package_support import digest, file_hash, validate_app, verified_commit
 
 # The oldest systems supported: Ubuntu 22.04 (glibc 2.35, GCC 12 libstdc++)
 # and Debian 12 (glibc 2.36). The build fails if any bundled program needs more.
@@ -133,8 +133,7 @@ Categories=AudioVideo;Audio;
     (control / 'control').write_text(re.sub(r'Installed-Size: \d+', f'Installed-Size: {installed_size}', content))
     with (control / 'md5sums').open('w') as checksums:
         for file in payload:
-            with file.open('rb') as data:
-                value = hashlib.file_digest(data, 'md5').hexdigest()
+            value = file_hash(file, 'md5')
             checksums.write(f'{value}  {file.relative_to(stage).as_posix()}\n')
     # dpkg records root ownership without requiring this build process to be root.
     partial = output.with_suffix('.deb.partial')
