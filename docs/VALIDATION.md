@@ -181,3 +181,12 @@ Alpha.10 applies the upstream presence comparison to a validated status payload.
 The revised regression fails on the alpha.9 source before the production fix. It checks all 256 possible presence values against the independent upstream comparison, plus descriptor rejection, unsupported commands, malformed responses and transport failures. All 339 native cases pass (57 existing cases and 282 presence cases), and all 66 application tests pass. The production UI build passes. The complete native patch was applied to a fresh pinned original export and compared byte-for-byte with the tested source before compiling the helper; corresponding source and tests are synchronized in the package. All five native helpers start with their bundled libraries.
 
 Presence diagnostics now retain each open/status/close reply as a bounded hexadecimal line, its stage and the interpreted flag or parsing mismatch. This is necessary to resolve any remaining device-specific difference without repeating the blind alpha.9 test cycle. No physical recorder is attached here: these tests do not prove the precise cause of the user's 29-byte reply or confirm the hardware fix. Complete-ZIP extraction, file integrity, permission restoration, five-helper startup, Electron Node-mode startup and matching embedded Git history remain the final release gates; no GUI test is claimed.
+
+## 1.2.0 hardware checks: 2026-10-03
+
+Owner's Linux Mint 22.3 desktop with a Sony MZ-N910, normal (non-admin) user account.
+
+- Upgrading over an early alpha left `/opt/Platinum-MD Next` owner-only, so the app was hidden from the menu and could not start. The installer now repairs the folder permissions; after reinstalling, the app appeared and started.
+- Recording one LP4 track onto a grouped disc ("Tom Petty", one group) appended it after the last track; groups unchanged.
+- Grouped disc: the group was shown; deleting the ungrouped last track, then three tracks inside the group (each followed by a verified group update, 1-19 to 1-16), and renaming a track all succeeded.
+- Moving track 11 to position 16 moved tracks 11 and 12 to the end. The app's order check caught it and stopped before writing groups. Cause: upstream `netmd_move_track` sent the move request twice. Fixed in the native patch; `test/native/move.c` covers it. Moving needs re-testing with the fixed helper.
