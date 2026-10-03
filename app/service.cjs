@@ -284,9 +284,17 @@ class NetMdService {
     return after;
   }
 
+  // The disc's current title and groups, when they can be rewritten safely.
+  groupLayout(disc) {
+    if (typeof disc.groupedTitle !== 'string' || disc.groupingNote) {
+      throw new Error(`${disc.groupingNote || 'This disc\'s group information cannot be changed safely.'} Groups cannot be changed on this disc.`);
+    }
+    return { title: disc.groupedTitle, groups: disc.groups };
+  }
+
   async edit(request, confirm) {
     const { action, revision } = request || {};
-    if (!['renameTrack', 'renameDisc', 'deleteTracks', 'moveTrack', 'repairGroups', 'play', 'pause', 'stop', 'next', 'previous'].includes(action)) {
+    if (!['renameTrack', 'renameDisc', 'deleteTracks', 'moveTrack', 'repairGroups', 'createGroup', 'renameGroup', 'removeGroup', 'play', 'pause', 'stop', 'next', 'previous'].includes(action)) {
       throw new Error('Unknown device action.');
     }
     return this.operation('Updating the recorder…', async () => {
@@ -334,6 +342,24 @@ class NetMdService {
             current = await this.writeGroups(current, { title: before.groupedTitle, groups: plan.groups });
           }
         }
+      } else if (action === 'createGroup') {
+        const layout = this.groupLayout(current);
+        if (!Array.isArray(request.tracks) || !request.tracks.length || request.tracks.length > 255) throw new Error('Select the tracks to group.');
+        const indices = [...new Set(request.tracks.map(i => trackNumber(i, current.tracks.length)))].sort((a, b) => a - b);
+        const start = indices[0], end = indices.at(-1);
+        if (end - start + 1 !== indices.length) throw new Error('A group holds tracks that follow each other. Select a continuous run of tracks.');
+        const name = safeTitle(request.title);
+        current = await this.writeGroups(current, { ...layout, groups: groupTitles.addGroup(layout.groups, current.tracks.length, start, end, name) });
+      } else if (action === 'renameGroup') {
+        const layout = this.groupLayout(current);
+        const name = safeTitle(request.title);
+        current = await this.writeGroups(current, { ...layout, groups: groupTitles.renameGroup(layout.groups, request.group, name) });
+      } else if (action === 'removeGroup') {
+        const layout = this.groupLayout(current);
+        const groups = groupTitles.removeGroup(layout.groups, request.group);
+        if (!await confirm(`Remove the group "${layout.groups[request.group].name}"?`,
+          'Only the group is removed. Its tracks stay on the disc, in the same order.')) return current;
+        current = await this.writeGroups(current, { ...layout, groups });
       } else if (action === 'repairGroups') {
         const repair = current.groupsRepair;
         if (!repair) throw new Error('This disc\'s groups do not need repairing.');
@@ -393,6 +419,7 @@ class NetMdService {
     });
     if (new Set(selected.map(t => t.id)).size !== selected.length) throw new Error('A file is selected more than once.');
     const discTitle = request.discTitle ? safeTitle(request.discTitle) : '';
+    const groupName = request.groupName ? safeTitle(request.groupName) : '';
     return this.operation('Preparing transfer…', async () => {
       const device = requireOneDevice(await this.enumerate());
       this.requireReadySession(device);
@@ -403,8 +430,19 @@ class NetMdService {
       if (needed > capacitySeconds(disc.availableTime)) throw new Error('The selected audio will not fit. Remove tracks or choose a longer recording mode.');
       if (selected.length + disc.tracks.length > 255) throw new Error('A MiniDisc can contain at most 255 tracks.');
       if (discTitle && disc.tracks.length) throw new Error('Automatic album naming is only available when the MiniDisc is empty.');
+      const firstNew = disc.tracks.length;
+      if (groupName) {
+        // Check before recording that the group can be added and will fit.
+        const layout = this.groupLayout(disc);
+        const planned = { title: discTitle || layout.title,
+          groups: groupTitles.addGroup(layout.groups, firstNew + selected.length, firstNew, firstNew + selected.length - 1, groupName) };
+        if (Buffer.byteLength(groupTitles.composeRawTitle(planned)) > groupTitles.MAX_RAW_TITLE_BYTES) {
+          throw new Error('The disc title and group names together would be too long for the recorder. Use a shorter group name.');
+        }
+      }
+      const placement = groupName ? ` into a new group "${groupName}"` : disc.groupCount > 1 ? ' after the last track, outside the disc\'s groups' : '';
       if (!await confirm(`Record ${selected.length} track(s) in ${request.mode}?`,
-        `New tracks will be appended${disc.groupCount > 1 ? ' after the last track, outside the disc\'s groups' : ''}. Keep the recorder connected until the transfer finishes.${discTitle ? `\nMiniDisc title after recording: ${discTitle}` : ''}`)) return { completed: [], cancelled: true };
+        `New tracks will be appended${placement}. Keep the recorder connected until the transfer finishes.${discTitle ? `\nMiniDisc title after recording: ${discTitle}` : ''}`)) return { completed: [], cancelled: true };
       disc = await this.assertUnchanged(disc.revision);
       const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'platinum-md-next-'));
       const completed = [];
@@ -552,7 +590,22 @@ class NetMdService {
             return result;
           });
         }
-        if (discTitle && completed.length === selected.length) {
+        if (groupName && completed.length) {
+          // Tracks recorded before a Stop are grouped too; the album title is
+          // used only when the whole batch was recorded.
+          this.status('Creating group…', { busy: true, recording: true });
+          try {
+            disc = await this.assertUnchanged(disc.revision);
+            if (disc.tracks.length !== firstNew + completed.length) throw new Error('Unexpected track count.');
+            const layout = this.groupLayout(disc);
+            const title = discTitle && completed.length === selected.length ? discTitle : layout.title;
+            disc = await this.writeGroups(disc, { title,
+              groups: groupTitles.addGroup(layout.groups, disc.tracks.length, firstNew, disc.tracks.length - 1, groupName) });
+          } catch (error) {
+            this.log('recording-group-failed', { message: error.message });
+            throw new Error('The tracks were recorded, but their group could not be created and verified. Refresh the disc, then select the new tracks and use Group; do not record those tracks again.');
+          }
+        } else if (discTitle && completed.length === selected.length) {
           this.status('Naming MiniDisc…', { busy: true, recording: true });
           try {
             disc = await this.assertUnchanged(disc.revision);

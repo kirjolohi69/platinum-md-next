@@ -115,9 +115,39 @@ function moveTrack(groups, trackCount, from, to) {
   return { groups: result, removed };
 }
 
+// New groups cover a run of tracks that are not in any group yet. Groups are
+// kept in track order, as the recorder lists them.
+function addGroup(groups, trackCount, start, end, name) {
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end >= trackCount) {
+    throw new Error('Select tracks that follow each other on the disc.');
+  }
+  const taken = groups.find(g => g.start !== null && start <= g.end && end >= g.start);
+  if (taken) throw new Error(`Some of these tracks are already in the group "${taken.name}". Remove that group first, or select other tracks.`);
+  const result = [...groups];
+  const at = result.findIndex(g => g.start !== null && g.start > end);
+  result.splice(at < 0 ? result.length : at, 0, { name, start, end });
+  return result;
+}
+
+function groupAt(groups, index) {
+  if (!Number.isInteger(index) || index < 0 || index >= groups.length) throw new Error('That group is no longer on the disc. Refresh the disc.');
+  return groups[index];
+}
+
+function renameGroup(groups, index, name) {
+  groupAt(groups, index);
+  return groups.map((g, i) => i === index ? { ...g, name } : g);
+}
+
+function removeGroup(groups, index) {
+  groupAt(groups, index);
+  return groups.filter((_, i) => i !== index);
+}
+
 function sameGroups(a, b) {
   const key = value => JSON.stringify([value.title, value.groups.map(g => [g.name, g.start, g.end])]);
   return key(a) === key(b);
 }
 
-module.exports = { MAX_RAW_TITLE_BYTES, parseRawTitle, composeRawTitle, readGroups, trimGroups, deleteTrack, moveTrack, sameGroups };
+module.exports = { MAX_RAW_TITLE_BYTES, parseRawTitle, composeRawTitle, readGroups, trimGroups, deleteTrack, moveTrack,
+  addGroup, renameGroup, removeGroup, sameGroups };

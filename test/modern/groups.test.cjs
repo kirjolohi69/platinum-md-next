@@ -60,7 +60,9 @@ function recorder(raw, names) {
     calls: [], meddle: null, fail: null };
   const listing = () => {
     const segments = state.raw.split('//').filter(s => s && (Number.parseInt(s, 10) > 0 || s.startsWith(';')));
-    const title = groups.parseRawTitle(state.raw).title || '<Untitled>';
+    let title = state.raw;
+    try { title = groups.parseRawTitle(state.raw).title; } catch {}
+    title ||= '<Untitled>';
     return JSON.stringify({ device: 'Sony MZ-N910', title, groupCount: segments.length + 1, rawTitle: state.raw,
       recordedTime: '00:30:00.00', totalTime: '01:20:00.00', availableTime: '00:50:00.00',
       tracks: state.tracks.map((t, no) => ({ no, ...t })) });
@@ -68,13 +70,18 @@ function recorder(raw, names) {
   const service = new NetMdService({ bin: n => n, env: {} }, () => {}, {
     enumerate: async () => [{ id: '054c:0186', writable: true, key: '054c:0186:1:2' }],
     sleep: async () => {},
-    run: async (_name, args) => {
+    run: async (name, args) => {
+      if (name !== 'netmdcli') return { stdout: '', exitCode: 0 }; // Audio conversion is not modelled.
       state.calls.push(args.map(String));
       const failure = state.fail?.(args);
       if (failure) throw Object.assign(new Error('netmdcli failed'), { exitCode: failure });
       if (args[0] === 'move') state.tracks.splice(args[2], 0, state.tracks.splice(args[1], 1)[0]);
       if (args[0] === 'delete') state.tracks.splice(args[1], 1);
       if (args[0] === 'settitle') state.raw = args[1];
+      if (args[1] === 'send') {
+        state.tracks.push({ name: args.at(-1), bitrate: 'SP', protect: 'UNPROTECTED', time: '00:03:00' });
+        if (state.stopAfterSend) service.stopRequested = true;
+      }
       if (args[0] !== '-v') state.meddle?.(state, args);
       const late = state.lateReply?.(args);
       if (late) throw Object.assign(new Error('reply arrived late'), { exitCode: late });
@@ -244,4 +251,134 @@ test('a change the recorder made despite a late reply is confirmed, never repeat
   await assert.rejects(other.service.edit({ action: 'deleteTracks', revision: other.service.disc.revision, tracks: [0] }, async () => true),
     /failed/);
   assert.equal(other.state.tracks.length, 6);
+});
+
+test('new groups cover free runs of tracks and are kept in track order', () => {
+  const start = [g('A', 0, 1), g('C', 5, 6)];
+  assert.deepEqual(groups.addGroup(start, 8, 2, 4, 'B'), [g('A', 0, 1), g('B', 2, 4), g('C', 5, 6)]);
+  assert.deepEqual(groups.addGroup(start, 8, 7, 7, 'D').at(-1), g('D', 7));
+  assert.throws(() => groups.addGroup(start, 8, 1, 3, 'X'), /already in the group "A"/);
+  assert.throws(() => groups.addGroup(start, 8, 6, 8, 'X'), /follow each other/);
+  assert.deepEqual(groups.renameGroup(start, 1, 'Z'), [g('A', 0, 1), g('Z', 5, 6)]);
+  assert.deepEqual(groups.removeGroup(start, 0), [g('C', 5, 6)]);
+  assert.throws(() => groups.removeGroup(start, 2), /no longer on the disc/);
+});
+
+const acdc = (raw = 'AC-DC') => recorder(raw, ['Hells Bells', 'Shoot to Thrill', 'Back in Black', 'Highway to Hell', 'Girls Got Rhythm']);
+
+test('a disc without groups gets its first group, written and verified', async () => {
+  const { service, state } = acdc();
+  await service.connect();
+  assert.equal(service.disc.groupingNote, '');
+  await service.edit({ action: 'createGroup', revision: service.disc.revision, tracks: [2, 0, 1], title: 'Back in Black' });
+  assert.equal(state.raw, '0;AC-DC//1-3;Back in Black//');
+  assert.deepEqual(service.disc.groups.map(x => [x.name, x.start, x.end]), [['Back in Black', 0, 2]]);
+  await service.edit({ action: 'createGroup', revision: service.disc.revision, tracks: [3, 4], title: 'Highway to Hell' });
+  assert.equal(state.raw, '0;AC-DC//1-3;Back in Black//4-5;Highway to Hell//');
+  assert.deepEqual(state.calls.filter(c => c[0] !== '-v').map(c => c[0]), ['settitle', 'settitle']);
+});
+
+test('a disc without a title can be grouped; its title stays empty', async () => {
+  const { service, state } = acdc('');
+  await service.connect();
+  await service.edit({ action: 'createGroup', revision: service.disc.revision, tracks: [0], title: 'Singles' });
+  assert.equal(state.raw, '0;//1;Singles//');
+});
+
+test('groups need a continuous run of tracks outside other groups', async () => {
+  const { service, state } = acdc('0;AC-DC//1-2;Early//');
+  await service.connect();
+  for (const [tracks, error] of [[[2, 4], /continuous/], [[1, 2], /already in the group "Early"/], [[], /Select the tracks/]]) {
+    await service.connect();
+    await assert.rejects(service.edit({ action: 'createGroup', revision: service.disc.revision, tracks, title: 'X' }), error);
+  }
+  await service.connect();
+  await assert.rejects(service.edit({ action: 'createGroup', revision: service.disc.revision, tracks: [2], title: 'A//B' }), /separator/);
+  assert.equal(settitles(state).length, 0);
+});
+
+test('groups can be renamed and removed; removing keeps the tracks', async () => {
+  const { service, state } = tomPetty();
+  await service.connect();
+  await service.edit({ action: 'renameGroup', revision: service.disc.revision, group: 1, title: 'B-side' });
+  assert.equal(state.raw, '0;Tom Petty//1-3;Early//4;B-side//5-6;Late//');
+  let asked;
+  await service.edit({ action: 'removeGroup', revision: service.disc.revision, group: 0 }, async m => { asked = m; return false; });
+  assert.match(asked, /Remove the group "Early"/);
+  assert.equal(settitles(state).length, 1);
+  await service.edit({ action: 'removeGroup', revision: service.disc.revision, group: 0 }, async () => true);
+  assert.equal(state.raw, '0;Tom Petty//4;B-side//5-6;Late//');
+  assert.equal(state.tracks.length, 6);
+  await assert.rejects(service.edit({ action: 'renameGroup', revision: service.disc.revision, group: 7, title: 'X' }), /no longer on the disc/);
+});
+
+test('discs whose title cannot be rewritten safely cannot get groups', async () => {
+  for (const raw of ['AC;DC', 'Café']) {
+    const { service, state } = acdc(raw);
+    await service.connect();
+    assert.notEqual(service.disc.groupingNote, '');
+    await assert.rejects(service.edit({ action: 'createGroup', revision: service.disc.revision, tracks: [0], title: 'X' }), /Groups cannot be changed/);
+    assert.equal(settitles(state).length, 0);
+  }
+});
+
+async function queue(t, service, names) {
+  const fs = require('node:fs/promises'), os = require('node:os'), path = require('node:path');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'netmd-group-recording-'));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'song.flac');
+  await fs.writeFile(file, 'stub');
+  const stat = await fs.stat(file);
+  for (const name of names) service.files.set(name, { id: name, path: file, title: name, duration: 180, size: stat.size, mtimeMs: stat.mtimeMs });
+  return { mode: 'SP', revision: service.disc.revision, tracks: names.map(name => ({ id: name, title: name })) };
+}
+
+test('two CDs recorded one after the other each go into their own new group', async t => {
+  const { service, state } = recorder('', []);
+  await service.connect();
+  let detail;
+  await service.upload({ ...await queue(t, service, ['Hells Bells', 'Shoot to Thrill']), groupName: 'Back in Black', discTitle: 'AC-DC' },
+    async (_m, text) => { detail = text; return true; });
+  assert.match(detail, /into a new group "Back in Black"/);
+  assert.equal(state.raw, '0;AC-DC//1-2;Back in Black//');
+  await service.upload({ ...await queue(t, service, ['Highway to Hell', 'Girls Got Rhythm', 'Walk All Over You']), groupName: 'Highway to Hell' }, async () => true);
+  assert.equal(state.raw, '0;AC-DC//1-2;Back in Black//3-5;Highway to Hell//');
+  assert.deepEqual(service.disc.groups.map(x => [x.name, x.start, x.end]), [['Back in Black', 0, 1], ['Highway to Hell', 2, 4]]);
+  // One title write per batch, after its tracks were recorded and verified.
+  assert.deepEqual(state.calls.filter(c => c[0] !== '-v' || c[1] === 'send').map(c => c[1] === 'send' ? 'send' : c[0]),
+    ['send', 'send', 'settitle', 'send', 'send', 'send', 'settitle']);
+});
+
+test('after Stop, the tracks already recorded are grouped and the album title is not written', async t => {
+  const { service, state } = recorder('0;Mix//', []);
+  await service.connect();
+  state.stopAfterSend = true;
+  const result = await service.upload({ ...await queue(t, service, ['One', 'Two']), groupName: 'Album' }, async () => true);
+  assert.equal(result.cancelled, true);
+  assert.equal(state.raw, '0;Mix//1;Album//');
+});
+
+test('a group that cannot be added is refused before anything is recorded', async t => {
+  for (const [raw, names, groupName, error] of [
+    ['AC;DC', ['A'], 'Album', /Groups cannot be changed/],
+    ['0;Disc//1;Old//', ['A'], 'x'.repeat(120), /too long/]
+  ]) {
+    const { service, state } = recorder(raw, ['Existing']);
+    await service.connect();
+    const request = await queue(t, service, names);
+    if (groupName.length === 120) state.raw = '0;' + 'D'.repeat(120) + '//1;Older//';
+    await service.connect();
+    await assert.rejects(service.upload({ ...request, revision: service.disc.revision, groupName }, async () => true), error);
+    assert.equal(state.calls.some(c => c[1] === 'send' || c[0] === 'settitle'), false);
+  }
+});
+
+test('if the new group cannot be verified, the recorded tracks are not offered again', async t => {
+  const { service, state } = recorder('0;Mix//', []);
+  await service.connect();
+  state.meddle = (current, args) => { if (args[0] === 'settitle') current.raw = '0;Mix//'; };
+  await assert.rejects(service.upload({ ...await queue(t, service, ['One']), groupName: 'Album' }, async () => true),
+    /recorded, but their group could not be created[\s\S]*do not record those tracks again/);
+  assert.equal(service.files.size, 0);
+  assert.equal(state.tracks.length, 1);
 });

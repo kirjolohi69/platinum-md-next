@@ -45,10 +45,16 @@ function parseDisc(output) {
     disc.groupsEditable = info.editable;
     disc.groupsNote = info.reason;
     disc.groupsRepair = info.repair || null;
+    disc.groupingNote = info.editable ? '' : info.reason;
   } else {
     disc.groups = [];
     disc.groupsEditable = true;
     disc.groupsNote = '';
+    // A disc without groups can get its first one only when its title can be
+    // rewritten safely in the group format.
+    const info = readGroups(value.rawTitle, disc.tracks.length, 1);
+    if (info.editable) disc.groupedTitle = info.title;
+    disc.groupingNote = info.editable ? '' : info.reason.replace('group information', 'title');
   }
   disc.revision = createHash('sha256').update(JSON.stringify(disc)).digest('hex');
   return disc;
