@@ -387,7 +387,7 @@ class NetMdService {
             return result;
           });
         }
-        if (discTitle && !this.stopRequested && completed.length === selected.length) {
+        if (discTitle && completed.length === selected.length) {
           this.status('Naming MiniDisc…', { busy: true, recording: true });
           try {
             disc = await this.assertUnchanged(disc.revision);
@@ -398,7 +398,7 @@ class NetMdService {
             throw new Error('The tracks were recorded, but the album title could not be verified. Refresh the disc before changing its title; do not record those tracks again.');
           }
         }
-        return { completed, cancelled: this.stopRequested };
+        return { completed, cancelled: completed.length < selected.length };
       } finally {
         // Only this process's uniquely created scratch directory is removed.
         await fs.rm(temporary, { recursive: true, force: true });

@@ -4,7 +4,7 @@ import { palettes, defaultAppearance, readAppearance, saveAppearance, applyAppea
 import { cdReadSpeeds, readCdReadSpeed, saveCdReadSpeed } from './cd-settings.mjs';
 
 const api = window.netmd;
-const version = ref('1.0.1');
+const version = ref('1.1.0');
 const appearance = ref(readAppearance()), appearanceDialog = ref(null), appearanceSaved = ref(true);
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
 const refreshAppearance = () => applyAppearance(appearance.value, document.documentElement, systemTheme.matches);
@@ -25,7 +25,7 @@ watch(recordingStage, stage => {
   }
 });
 const message = ref('Connect your NetMD recorder to get started.'), error = ref(''), connectionError = ref('');
-const diagnostics = ref(false), logs = ref([]), editor = ref(null), editValue = ref('');
+const diagnostics = ref(false), logs = ref([]), editor = ref(null), editValue = ref(''), dragging = ref(false);
 const cdDialog = ref(null), cdDrives = ref([]), cdDevice = ref(''), audioCd = ref(null), cdError = ref('');
 const cdSelection = computed(() => audioCd.value?.tracks.filter(t => t.selected) || []);
 const cdMatches = ref([]), cdRelease = ref(''), lookupBusy = ref(false), lookupMessage = ref('');
@@ -67,11 +67,26 @@ async function perform(task, connection = false) {
   target.value = '';
   try { return await task(); } catch (e) { target.value = e.message; }
 }
-async function addFiles() {
-  const result = await perform(() => api.addFiles());
+function queueImported(result) {
   if (!result) return;
   files.value.push(...result.files.map(f => ({ ...f, selected: true })));
   if (result.errors.length) error.value = result.errors.join('\n');
+}
+async function addFiles() {
+  queueImported(await perform(() => api.addFiles()));
+}
+function dragOver(event) {
+  if (busy.value || !api || !event.dataTransfer.types.includes('Files')) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+  dragging.value = true;
+}
+async function dropFiles(event) {
+  dragging.value = false;
+  if (busy.value || !api || !event.dataTransfer.files.length) return;
+  const result = await perform(() => api.addDroppedFiles([...event.dataTransfer.files]));
+  if (result && !result.files.length && !result.errors.length) error.value = 'Folders cannot be added. Drop the audio files themselves.';
+  queueImported(result);
 }
 async function clearQueue() {
   const ids = files.value.map(f => f.id);
@@ -219,9 +234,9 @@ onUnmounted(() => { unsubscribe?.(); clearInterval(stageClock); systemTheme.remo
     <div v-if="error || connectionError" class="error-message" role="alert"><div><strong>Something needs attention</strong><p>{{ error || connectionError }}</p><button class="text-button" @click="diagnostics = true">View diagnostics</button></div><button class="icon-button" aria-label="Dismiss error" @click="error = ''; connectionError = ''">×</button></div>
 
     <main class="workspace">
-      <section class="panel music-panel">
+      <section class="panel music-panel" :class="{ dragging }" @dragover="dragOver" @dragleave="$event.currentTarget.contains($event.relatedTarget) || (dragging = false)" @drop.prevent="dropFiles">
         <div class="panel-heading queue-heading"><div><p class="eyebrow">FROM YOUR COMPUTER</p><h2>Recording queue <span class="count">{{ files.length }}</span></h2></div><div class="queue-add"><button :disabled="busy || !api" @click="openCd">Add audio CD</button><button :disabled="busy || !api" @click="addFiles">+ Add audio</button></div></div>
-        <div v-if="!files.length" class="empty-state"><div class="audio-symbol" aria-hidden="true">♫</div><h3>Make your next mix.</h3><p>Add music, arrange your tracks,<br>then record them to MiniDisc.</p><p class="formats">FLAC · MP3 · WAV · AAC · and more</p></div>
+        <div v-if="!files.length" class="empty-state"><div class="audio-symbol" aria-hidden="true">♫</div><h3>Make your next mix.</h3><p>Add music or drop audio files here,<br>arrange your tracks, then record them to MiniDisc.</p><p class="formats">FLAC · MP3 · WAV · AAC · and more</p></div>
         <div v-else class="track-list">
           <div class="list-bar"><label><input type="checkbox" :checked="picked.length === files.length" :disabled="busy" @change="files.forEach(f => f.selected = $event.target.checked)"> Select all</label><button class="text-button" :disabled="busy" @click="clearQueue">Clear queue</button></div>
           <div v-for="(file, index) in files" :key="file.id" class="file-row">

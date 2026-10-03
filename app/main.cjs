@@ -78,6 +78,12 @@ if (gotLock) app.whenReady().then(async () => {
       ] });
     return result.canceled ? { files: [], errors: [] } : service.importFiles(result.filePaths);
   });
+  register('files:add-paths', paths => {
+    if (service.gate.busy) throw new Error('Wait for the current operation to finish.');
+    if (!Array.isArray(paths) || !paths.length || paths.length > 255 ||
+        paths.some(p => typeof p !== 'string' || !path.isAbsolute(p))) throw new Error('Drop audio files from your computer.');
+    return service.importFiles(paths);
+  });
   register('files:forget', ids => service.forgetFiles(ids));
   register('cd:drives', () => service.audioCd.enumerate());
   register('cd:scan', device => service.scanCd(device));

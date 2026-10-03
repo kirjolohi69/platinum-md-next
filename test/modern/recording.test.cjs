@@ -124,6 +124,21 @@ test('automatic album title is confirmed and written only after all tracks commi
   assert.equal(service.disc.title, 'Artist - Album');
 });
 
+test('stopping during the final track still finishes the batch and names the MiniDisc', async t => {
+  for (const [stopAfterSend, expected] of [[2, { recorded: 2, title: 'Album', cancelled: false }],
+    [1, { recorded: 1, title: 'Spare test disc', cancelled: true }]]) {
+    const { service, state, request } = await fixture(t, 0);
+    const run = service.run;
+    service.run = async (name, args, options) => {
+      const result = await run(name, args, options);
+      if (args[1] === 'send' && state.sends === stopAfterSend) service.stopRequested = true;
+      return result;
+    };
+    const result = await service.upload({ ...request(), discTitle: 'Album' }, async () => true);
+    assert.deepEqual({ recorded: result.completed.length, title: service.disc.title, cancelled: result.cancelled }, expected);
+  }
+});
+
 test('cancelled or failed batches do not rename the MiniDisc', async t => {
   const cancelled = await fixture(t, 0);
   await cancelled.service.upload({ ...cancelled.request(), discTitle: 'Album' }, async () => false);
