@@ -112,6 +112,22 @@ class NetMdService {
     }
   }
 
+  // A late reply can make a change look failed although the recorder made it.
+  // Never repeat the command: read the disc and continue only if it is now
+  // exactly what was asked for.
+  async change(args, accept, timeoutMs) {
+    try {
+      await this.netmd(args, timeoutMs);
+    } catch (error) {
+      let after;
+      try { after = await this.readDisc(); } catch { throw error; }
+      if (!accept(after)) throw error;
+      this.log('change-confirmed-after-error', { command: String(args[0]), message: error.message });
+      return after;
+    }
+    return this.readDisc();
+  }
+
   async readDisc(allowNoDisc = false) {
     const device = requireOneDevice(await this.enumerate());
     this.requireReadySession(device);
@@ -259,11 +275,12 @@ class NetMdService {
     // The previous group line stays in Diagnostics so it can be restored by hand.
     this.log('group-title-write', { before: current.rawTitle, after: raw });
     const failed = 'The updated groups could not be saved and verified. Check the groups on the recorder before changing anything else. The earlier group information is saved in Diagnostics.';
-    try { await this.netmd(['settitle', raw]); } catch { throw new Error(failed); }
-    const after = await this.readDisc();
     const tracks = disc => JSON.stringify(disc.tracks.map(({ no, ...t }) => t));
-    if (tracks(after) !== tracks(current) || typeof after.rawTitle !== 'string' ||
-        !groupTitles.sameGroups(groupTitles.parseRawTitle(after.rawTitle), expected)) throw new Error(failed);
+    const saved = disc => tracks(disc) === tracks(current) && typeof disc.rawTitle === 'string' &&
+      groupTitles.sameGroups(groupTitles.parseRawTitle(disc.rawTitle), expected);
+    let after;
+    try { after = await this.change(['settitle', raw], saved); } catch { throw new Error(failed); }
+    if (!saved(after)) throw new Error(failed);
     return after;
   }
 
@@ -283,8 +300,7 @@ class NetMdService {
       if (action === 'renameTrack') {
         const index = trackNumber(request.track, current.tracks.length);
         const title = safeTitle(request.title);
-        await this.netmd(['rename', index, title]);
-        current = await this.readDisc();
+        current = await this.change(['rename', index, title], disc => disc.tracks[index]?.name === title);
         if (current.tracks[index]?.name !== title) throw new Error('The title change could not be verified. Refresh the disc before trying again.');
       } else if (action === 'renameDisc') {
         this.requireEditableGroups(current);
@@ -292,8 +308,7 @@ class NetMdService {
         if (current.groupCount > 1) {
           current = await this.writeGroups(current, { title, groups: current.groups });
         } else {
-          await this.netmd(['settitle', title]);
-          current = await this.readDisc();
+          current = await this.change(['settitle', title], disc => disc.title === title);
         }
         if (current.title !== title) throw new Error('The disc title change could not be verified.');
       } else if (action === 'moveTrack') {
@@ -308,13 +323,14 @@ class NetMdService {
           const expected = current.tracks.map(({ no, ...track }) => track);
           expected.splice(to, 0, expected.splice(from, 1)[0]);
           const before = current;
-          await this.netmd(['move', from, to]);
-          current = await this.readDisc();
-          if (JSON.stringify(expected) !== JSON.stringify(current.tracks.map(({ no, ...t }) => t))) {
+          const moved = disc => JSON.stringify(expected) === JSON.stringify(disc.tracks.map(({ no, ...t }) => t));
+          current = await this.change(['move', from, to], moved);
+          if (!moved(current)) {
             throw new Error('The new track order could not be verified. Refresh the disc before continuing.');
           }
           if (grouped) {
             this.checkGroupsUntouched(before, current);
+            await this.sleep(1000);
             current = await this.writeGroups(current, { title: before.groupedTitle, groups: plan.groups });
           }
         }
@@ -349,13 +365,14 @@ class NetMdService {
           const grouped = before.groupCount > 1;
           const plan = grouped ? groupTitles.deleteTrack(before.groups, index) : null;
           const expected = before.tracks.filter((_, i) => i !== index).map(({ no, ...t }) => t);
-          await this.netmd(['delete', index, index], 90000);
-          current = await this.readDisc();
-          if (JSON.stringify(expected) !== JSON.stringify(current.tracks.map(({ no, ...t }) => t))) {
+          const deleted = disc => JSON.stringify(expected) === JSON.stringify(disc.tracks.map(({ no, ...t }) => t));
+          current = await this.change(['delete', index, index], deleted, 90000);
+          if (!deleted(current)) {
             throw new Error('Deletion could not be verified. No further tracks were deleted. Refresh the disc.');
           }
           if (grouped) {
             this.checkGroupsUntouched(before, current);
+            await this.sleep(1000);
             current = await this.writeGroups(current, { title: before.groupedTitle, groups: plan.groups });
           }
         }

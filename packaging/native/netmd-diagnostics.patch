@@ -941,3 +941,76 @@
      }
  
      // Construct JSON object
+--- a/libnetmd/libnetmd.c
++++ b/libnetmd/libnetmd.c
+@@ -499,8 +499,16 @@
+ 
+     /* the title update command wants to now how many bytes to replace */
+     oldsize = request_disc_title(dev, (char *)reply, sizeof(reply));
+-    if(oldsize == -1)
+-        oldsize = 0; /* Reading failed -> no title at all, replace 0 bytes */
++    if(oldsize == NETMDERR_CMD_INVALID)
++        oldsize = 0; /* The recorder reports no title: replace 0 bytes */
++    else if(oldsize < 0)
++    {
++        /* Upstream assumed an empty title here. After a failed read (for
++         * example a busy recorder) that would insert the new title in front
++         * of the old one instead of replacing it. Write nothing. */
++        netmd_log(NETMD_LOG_ERROR, "netmd_set_disc_title: current title unreadable, nothing written\n");
++        return NETMD_TITLE_NOT_WRITTEN;
++    }
+ 
+     request = malloc(21 + title_length);
+     memset(request, 0, 21 + title_length);
+--- a/libnetmd/libnetmd.h
++++ b/libnetmd/libnetmd.h
+@@ -155,6 +155,10 @@
+ 
+ int netmd_create_group(netmd_dev_handle* dev, minidisc* md, char* name);
+ 
++/** netmd_set_disc_title: the current title could not be read, so nothing
++    was written (its length is needed to replace it). */
++#define NETMD_TITLE_NOT_WRITTEN (-100)
++
+ int netmd_set_disc_title(netmd_dev_handle* dev, char* title, size_t title_length);
+ 
+ /**
+--- a/netmdcli/netmdcli.c
++++ b/netmdcli/netmdcli.c
+@@ -287,9 +287,15 @@
+         {
+             if (!check_args(argc, 3, "rename")) return -1;
+             i = strtoul(argv[2], NULL, 10);
+-            netmd_cache_toc(devh);
+-            exit_code = netmd_set_title(devh, i & 0xffff, argv[3]) ? 0 : 1;
+-            netmd_sync_toc(devh);
++            /* A recorder still busy with the previous change answers late;
++             * write nothing rather than continue out of step. */
++            if (netmd_cache_toc(devh) <= 0) {
++                fprintf(stderr, "rename: recorder not ready, nothing written\n");
++                exit_code = EXIT_NOTHING_SENT;
++            } else {
++                exit_code = netmd_set_title(devh, i & 0xffff, argv[3]) ? 0 : 1;
++                netmd_sync_toc(devh);
++            }
+         }
+         else if(strcmp("move", argv[1]) == 0)
+         {
+@@ -328,8 +334,15 @@
+                 exit_code = 1;
+                 goto title_done;
+             }
+-            netmd_cache_toc(devh);
+-            exit_code = netmd_set_disc_title(devh, argv[2], strlen(argv[2])) < 0 ? 1 : 0;
++            if (netmd_cache_toc(devh) <= 0) {
++                fprintf(stderr, "settitle: recorder not ready, nothing written\n");
++                exit_code = EXIT_NOTHING_SENT;
++                goto title_done;
++            }
++            {
++                int title_result = netmd_set_disc_title(devh, argv[2], strlen(argv[2]));
++                exit_code = title_result == NETMD_TITLE_NOT_WRITTEN ? EXIT_NOTHING_SENT : title_result < 0 ? 1 : 0;
++            }
+             netmd_sync_toc(devh);
+             title_done: ;
+         }

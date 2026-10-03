@@ -76,6 +76,8 @@ function recorder(raw, names) {
       if (args[0] === 'delete') state.tracks.splice(args[1], 1);
       if (args[0] === 'settitle') state.raw = args[1];
       if (args[0] !== '-v') state.meddle?.(state, args);
+      const late = state.lateReply?.(args);
+      if (late) throw Object.assign(new Error('reply arrived late'), { exitCode: late });
       return { stdout: listing(), exitCode: 0 };
     }
   });
@@ -220,4 +222,26 @@ test('deleting every track from a grouped disc leaves no groups behind', async (
   assert.equal(state.tracks.length, 0);
   assert.equal(state.raw, '0;Tom Petty//');
   assert.equal(service.disc.groupCount, 1);
+});
+
+test('a change the recorder made despite a late reply is confirmed, never repeated', async () => {
+  // Hardware report: deleting every track, a group update was written but
+  // its reply timed out (exit 1). The listing afterwards showed it applied.
+  const { service, state } = tomPetty();
+  await service.connect();
+  let writes = 0;
+  state.lateReply = args => args[0] === 'settitle' && ++writes === 3 ? 1 : 0;
+  await service.edit({ action: 'deleteTracks', revision: service.disc.revision, tracks: [0, 1, 2, 3, 4, 5] }, async () => true);
+  assert.equal(state.tracks.length, 0);
+  assert.equal(state.raw, '0;Tom Petty//');
+  assert.equal(service.logs.filter(e => e.event === 'change-confirmed-after-error').length, 1);
+  // Every group update was sent exactly once.
+  assert.equal(new Set(settitles(state)).size, settitles(state).length);
+  // A failed delete that did not happen still stops everything.
+  const other = tomPetty();
+  await other.service.connect();
+  other.state.fail = args => args[0] === 'delete' ? 1 : 0;
+  await assert.rejects(other.service.edit({ action: 'deleteTracks', revision: other.service.disc.revision, tracks: [0] }, async () => true),
+    /failed/);
+  assert.equal(other.state.tracks.length, 6);
 });

@@ -32,6 +32,8 @@ Decisions already made (do not reopen without the owner asking):
 
 - Never retry a write automatically. Verify every write by reading the disc back; on any mismatch, stop and explain.
 - Group information lives inside the raw disc title (`0;Title//1-3;Group//`). `netmdcli settitle` overwrites the whole title. Since 1.2.0 the patched `netmdcli` reports it as `rawTitle`, and `app/groups.cjs` parses/rewrites it. Track commands (`send`, `move`, `delete`, `rename`) never touch it, so after a move/delete the app checks `rawTitle` is unchanged, writes the adjusted line with `settitle` (max 255 bytes), and reads it back. Discs whose line is not printable ASCII or not fully understood stay read-only for move/delete/disc rename (`groupsEditable: false`).
+- The MZ-N910 can answer late right after a change. netmdcli exits 3 only when nothing reached the recorder; `NetMdService.netmd()` retries once only then. After any other failed change, `NetMdService.change()` re-reads the disc and accepts the result only if it is exactly the intended one; commands are never repeated.
+- Upstream libnetmd bugs fixed in the patch: `netmd_move_track` sent the move twice; `netmd_set_disc_title` wrote with a guessed old length after a failed read. Expect more such bugs: verify on hardware.
 - Changes to recording, disc editing, USB or the native patch need the owner's spare-disc hardware test before a release.
 
 ## Workflow
