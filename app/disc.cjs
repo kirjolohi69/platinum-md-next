@@ -44,6 +44,7 @@ function parseDisc(output) {
     disc.groupedTitle = info.title;
     disc.groupsEditable = info.editable;
     disc.groupsNote = info.reason;
+    disc.groupsRepair = info.repair || null;
   } else {
     disc.groups = [];
     disc.groupsEditable = true;

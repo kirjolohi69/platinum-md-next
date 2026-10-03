@@ -57,7 +57,7 @@ test('moving a track keeps every group in one piece', () => {
 // the disc title, and settitle replaces the whole title including groups.
 function recorder(raw, names) {
   const state = { raw, tracks: names.map(name => ({ name, bitrate: 'LP2', protect: 'UNPROTECTED', time: '00:03:00' })),
-    calls: [], meddle: null };
+    calls: [], meddle: null, fail: null };
   const listing = () => {
     const segments = state.raw.split('//').filter(s => s && (Number.parseInt(s, 10) > 0 || s.startsWith(';')));
     const title = groups.parseRawTitle(state.raw).title || '<Untitled>';
@@ -67,8 +67,11 @@ function recorder(raw, names) {
   };
   const service = new NetMdService({ bin: n => n, env: {} }, () => {}, {
     enumerate: async () => [{ id: '054c:0186', writable: true, key: '054c:0186:1:2' }],
+    sleep: async () => {},
     run: async (_name, args) => {
       state.calls.push(args.map(String));
+      const failure = state.fail?.(args);
+      if (failure) throw Object.assign(new Error('netmdcli failed'), { exitCode: failure });
       if (args[0] === 'move') state.tracks.splice(args[2], 0, state.tracks.splice(args[1], 1)[0]);
       if (args[0] === 'delete') state.tracks.splice(args[1], 1);
       if (args[0] === 'settitle') state.raw = args[1];
@@ -165,4 +168,56 @@ test('group lines too long for the recorder are refused before writing', async (
   await assert.rejects(service.edit({ action: 'renameDisc', revision: service.disc.revision, title: 'A longer disc title' }, async () => true),
     /too long/);
   assert.deepEqual(settitles(state), []);
+});
+
+test('groups running past the last track can be repaired after confirming', async () => {
+  // Left behind on hardware when the group update after a delete could not run.
+  assert.deepEqual(groups.trimGroups([g('A', 0, 2), g('B', 3, 5), g('C', 6, 7)], 5),
+    { groups: [g('A', 0, 2), g('B', 3, 4)], changes: [{ name: 'B', before: g('B', 3, 5), after: g('B', 3, 4) }, { name: 'C', before: g('C', 6, 7), after: null }] });
+  const { service, state } = recorder('0;Tom Petty//1-16;Greatest Hits//', Array.from({ length: 15 }, (_, i) => `Song ${i + 1}`));
+  await service.connect();
+  assert.equal(service.disc.groupsEditable, false);
+  assert.ok(service.disc.groupsRepair);
+  let detail;
+  await service.edit({ action: 'repairGroups', revision: service.disc.revision }, async (_m, text) => { detail = text; return false; });
+  assert.match(detail, /Greatest Hits: tracks 1-16 → tracks 1-15/);
+  assert.deepEqual(settitles(state), []);
+  await service.edit({ action: 'repairGroups', revision: service.disc.revision }, async () => true);
+  assert.equal(state.raw, '0;Tom Petty//1-15;Greatest Hits//');
+  assert.equal(service.disc.groupsEditable, true);
+  await assert.rejects(service.edit({ action: 'repairGroups', revision: service.disc.revision }, async () => true), /do not need repairing/);
+});
+
+test('a busy recorder is tried once more only when nothing was sent', async () => {
+  const { service, state } = tomPetty();
+  await service.connect();
+  // Exit 3: the helper stopped before sending anything, so one more try is safe.
+  let busy = 1;
+  state.fail = args => args[0] === 'settitle' && busy-- > 0 ? 3 : 0;
+  await service.edit({ action: 'deleteTracks', revision: service.disc.revision, tracks: [0] }, async () => true);
+  assert.equal(state.raw, '0;Tom Petty//1-2;Early//3;Single//4-5;Late//');
+  assert.equal(settitles(state).length, 2);
+  assert.ok(service.logs.some(e => e.event === 'helper-retry-nothing-sent'));
+  // Any other failure may have changed the disc and is never repeated.
+  state.fail = args => args[0] === 'settitle' ? 1 : 0;
+  await assert.rejects(service.edit({ action: 'deleteTracks', revision: service.disc.revision, tracks: [0] }, async () => true),
+    /could not be saved and verified/);
+  assert.equal(settitles(state).length, 3);
+  const fresh = tomPetty();
+  await fresh.service.connect();
+  fresh.state.fail = args => args[0] === 'delete' ? 1 : 0;
+  await assert.rejects(fresh.service.edit({ action: 'deleteTracks', revision: fresh.service.disc.revision, tracks: [0] }, async () => true));
+  assert.equal(fresh.state.calls.filter(c => c[0] === 'delete').length, 1);
+});
+
+test('deleting every track from a grouped disc leaves no groups behind', async () => {
+  const { service, state } = tomPetty();
+  await service.connect();
+  let detail;
+  await service.edit({ action: 'deleteTracks', revision: service.disc.revision, tracks: [0, 1, 2, 3, 4, 5] },
+    async (_m, text) => { detail = text; return true; });
+  assert.match(detail, /Early[\s\S]*Single[\s\S]*Late|Late[\s\S]*Single[\s\S]*Early/);
+  assert.equal(state.tracks.length, 0);
+  assert.equal(state.raw, '0;Tom Petty//');
+  assert.equal(service.disc.groupCount, 1);
 });

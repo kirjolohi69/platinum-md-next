@@ -48,6 +48,20 @@ function groupProblem(groups, trackCount) {
   return '';
 }
 
+// Groups that run past the last track (left behind when a group update did
+// not finish) are shortened to end there. Used only after the user confirms.
+function trimGroups(groups, trackCount) {
+  const result = [], changes = [];
+  for (const group of groups) {
+    if (group.start === null || group.end < trackCount) { result.push(group); continue; }
+    if (group.start >= trackCount) { changes.push({ name: group.name, before: group, after: null }); continue; }
+    const after = { ...group, end: trackCount - 1 };
+    result.push(after);
+    changes.push({ name: group.name, before: group, after });
+  }
+  return { groups: result, changes };
+}
+
 // Everything the app needs to know before it may rewrite a disc's groups.
 function readGroups(raw, trackCount, groupCount) {
   const blocked = reason => ({ title: '', groups: [], editable: false, reason });
@@ -55,11 +69,15 @@ function readGroups(raw, trackCount, groupCount) {
   if (!/^[\x20-\x7e]*$/.test(raw)) return blocked('This disc\'s titles use characters this version cannot safely rewrite.');
   let parsed;
   try { parsed = parseRawTitle(raw); } catch (error) { return blocked(`This disc's group information is in an unusual format. ${error.message}`); }
-  const problem = groupProblem(parsed.groups, trackCount);
-  if (problem) return { ...parsed, editable: false, reason: problem };
   // libnetmd counts the disc title as a group. A mismatch means entries we do
   // not understand (for example unnamed groups) that a rewrite would drop.
   if (parsed.groups.length + 1 !== groupCount) return { ...parsed, editable: false, reason: 'This disc\'s group information contains entries this version does not understand.' };
+  const problem = groupProblem(parsed.groups, trackCount);
+  if (problem) {
+    const trimmed = trimGroups(parsed.groups, trackCount);
+    const repair = !groupProblem(trimmed.groups, trackCount) ? trimmed : null;
+    return { ...parsed, editable: false, reason: problem, repair };
+  }
   return { ...parsed, editable: true, reason: '' };
 }
 
@@ -102,4 +120,4 @@ function sameGroups(a, b) {
   return key(a) === key(b);
 }
 
-module.exports = { MAX_RAW_TITLE_BYTES, parseRawTitle, composeRawTitle, readGroups, deleteTrack, moveTrack, sameGroups };
+module.exports = { MAX_RAW_TITLE_BYTES, parseRawTitle, composeRawTitle, readGroups, trimGroups, deleteTrack, moveTrack, sameGroups };
