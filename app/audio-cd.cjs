@@ -45,17 +45,17 @@ async function listDrives(sysRoot = '/sys/class/block', devRoot = '/dev') {
 class AudioCd {
   constructor(tool, enumerate = listDrives) { this.tool = tool; this.enumerate = enumerate; }
 
-  async scan(device) {
+  async scan(device, signal) {
     const drive = (await this.enumerate()).find(d => d.device === device);
     if (!drive) throw new Error('The CD drive is no longer connected. Refresh the drive list.');
     if (!drive.accessible) throw new Error('Your account cannot access this CD drive. Check its permissions in Linux, then try again.');
     let result;
-    try { result = await this.tool('cdparanoia', ['-Q', '-d', drive.device], 45000); }
+    try { result = await this.tool('cdparanoia', ['-Q', '-d', drive.device], 45000, signal); }
     catch { throw new Error('Could not read the audio CD. Insert a music CD, close other CD apps, and try again. Details are in Diagnostics.'); }
     return { device: drive.device, label: drive.label, ...parseToc(result.stdout + '\n' + result.stderr) };
   }
 
-  async readTrack(source, output, readSpeed = 'max', onTiming = () => {}) {
+  async readTrack(source, output, readSpeed = 'max', onTiming = () => {}, signal) {
     const speed = validateReadSpeed(readSpeed);
     const measure = async (step, task) => {
       const started = performance.now();
@@ -63,7 +63,7 @@ class AudioCd {
       try { const result = await task(); success = true; return result; }
       finally { onTiming({ step, elapsedMs: Math.round(performance.now() - started), success }); }
     };
-    const current = await measure('check-before', () => this.scan(source.device));
+    const current = await measure('check-before', () => this.scan(source.device, signal));
     const track = current.tracks.find(t => t.number === source.number);
     if (current.revision !== source.revision || !track) throw new Error('The audio CD changed. Remove its queued tracks and add the new CD.');
     if (track.unavailable) throw new Error(track.unavailable);
@@ -72,14 +72,14 @@ class AudioCd {
     // are requests only: the drive may limit or ignore them. Never disable
     // correction to reach a requested speed.
     const speedArgs = speed === 'max' ? [] : ['-S', speed];
-    try { await measure('extract', () => this.tool('cdparanoia', ['-q', '-X', '-w', ...speedArgs, '-d', source.device, String(track.number), output], 30 * 60 * 1000)); }
+    try { await measure('extract', () => this.tool('cdparanoia', ['-q', '-X', '-w', ...speedArgs, '-d', source.device, String(track.number), output], 30 * 60 * 1000, signal)); }
     catch { throw new Error('Could not read this CD track completely. The recording queue has stopped. Check the CD and save Diagnostics.'); }
-    const after = await measure('check-after', () => this.scan(source.device));
+    const after = await measure('check-after', () => this.scan(source.device, signal));
     if (after.revision !== current.revision) throw new Error('The audio CD changed while it was being read. No audio from this read was recorded.');
     // A failed/short extraction must not become a shortened MiniDisc recording.
     await measure('validate-audio', async () => {
       const result = await this.tool('ffprobe', ['-v', 'error', '-show_entries',
-        'format=duration:stream=codec_name,sample_rate,channels', '-of', 'json', output], 15000);
+        'format=duration:stream=codec_name,sample_rate,channels', '-of', 'json', output], 15000, signal);
       const info = JSON.parse(result.stdout), stream = info.streams?.[0];
       const duration = Number(info.format?.duration);
       if (stream?.codec_name !== 'pcm_s16le' || Number(stream.sample_rate) !== 44100 || stream.channels !== 2 ||
