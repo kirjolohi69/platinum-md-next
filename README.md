@@ -1,5 +1,7 @@
 **⚠️ Note that this software is 100% vibe-coded, first with ChatGPT and now with Claude ⚠️**
 
+<p align="center"><img src="static/icons/platinum-md-next.svg" width="128" height="128" alt="Platinum-MD Next logo"></p>
+
 # Platinum-MD Next
 
 Record music to NetMD MiniDisc recorders from Linux. A modernized fork of [Platinum-MD by Gavin Benda](https://github.com/gavinbenda/platinum-md).
