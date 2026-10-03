@@ -1,6 +1,6 @@
 {
   "name": "platinum-md-next",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "A modern Linux desktop for NetMD MiniDisc recorders",
   "author": "Platinum-MD Next contributors",
@@ -38,7 +38,7 @@
   "desktopName": "platinum-md-next.desktop",
   "musicbrainzContact": "https://github.com/kirjolohi69/platinum-md-next",
   "debianEpoch": 1,
-  "releaseNotes": "docs/RELEASE_1_1_0.md",
+  "releaseNotes": "docs/RELEASE_1_2_0.md",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kirjolohi69/platinum-md-next.git"

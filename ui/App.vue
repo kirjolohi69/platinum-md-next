@@ -4,7 +4,7 @@ import { palettes, defaultAppearance, readAppearance, saveAppearance, applyAppea
 import { cdReadSpeeds, readCdReadSpeed, saveCdReadSpeed } from './cd-settings.mjs';
 
 const api = window.netmd;
-const version = ref('1.1.0');
+const version = ref('1.2.0');
 const appearance = ref(readAppearance()), appearanceDialog = ref(null), appearanceSaved = ref(true);
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
 const refreshAppearance = () => applyAppearance(appearance.value, document.documentElement, systemTheme.matches);
@@ -54,7 +54,6 @@ const canEdit = computed(() => disc.value && !busy.value);
 const recordingUnavailable = computed(() => {
   if (!disc.value) return '';
   if (/^00:00:00\.00$/.test(disc.value.availableTime)) return 'This disc is full. Use another MiniDisc to record more music.';
-  if (disc.value.groupCount > 1) return 'Recording to grouped discs is unavailable in this version.';
   return '';
 });
 const oneTrack = computed(() => selected.value.length === 1 ? disc.value?.tracks.find(t => t.no === selected.value[0]) : null);
@@ -266,7 +265,7 @@ onUnmounted(() => { unsubscribe?.(); clearInterval(stageClock); systemTheme.remo
         <div class="panel-heading"><div><p class="eyebrow">ON YOUR RECORDER</p><h2>{{ disc?.title || 'Your MiniDisc' }}</h2></div><button :disabled="!canEdit || disc?.groupCount > 1" @click="edit('renameDisc')">Rename disc</button></div>
         <template v-if="disc">
           <div class="disc-summary"><span>{{ disc.tracks.length }} tracks</span><span>{{ disc.availableTime.replace(/\.\d+$/, '') }} free in SP</span></div>
-          <p v-if="disc.groupCount > 1" class="group-notice">This disc contains groups. Recording, moving, deleting and renaming the disc are unavailable in this version.</p>
+          <p v-if="disc.groupCount > 1" class="group-notice">This disc contains groups. New recordings are added after the last track, outside the groups. Moving, deleting and renaming the disc are unavailable in this version, to protect the groups.</p>
           <div v-if="!disc.tracks.length" class="empty-state"><div class="mini-disc" aria-hidden="true"><i></i></div><h3>A fresh start.</h3><p>Your MiniDisc is ready for music.</p></div>
           <div v-else class="track-list disc-tracks"><table><thead><tr><th><input type="checkbox" :disabled="busy" :checked="selected.length === disc.tracks.length" aria-label="Select all disc tracks" @change="selected = $event.target.checked ? disc.tracks.map(t => t.no) : []"></th><th>#</th><th>TRACK</th><th>MODE</th><th>LENGTH</th></tr></thead><tbody><tr v-for="track in disc.tracks" :key="track.no" :class="{ selected: selected.includes(track.no) }"><td><input v-model="selected" type="checkbox" :value="track.no" :disabled="busy" :aria-label="`Select ${track.name}`"></td><td class="track-number">{{ String(track.no + 1).padStart(2, '0') }}</td><td class="disc-track-title">{{ track.name || 'Untitled track' }}</td><td><span class="mode-badge">{{ track.bitrate }}</span></td><td><time>{{ track.time.slice(0, -3) }}</time></td></tr></tbody></table></div>
           <div class="disc-tools"><div><button :disabled="!canEdit || !oneTrack" @click="edit('renameTrack', oneTrack)">Rename</button><button :disabled="!canEdit || !oneTrack || disc.groupCount > 1" @click="edit('moveTrack', oneTrack)">Move</button><button class="danger" :disabled="!canEdit || !selected.length || disc.groupCount > 1" @click="action('deleteTracks')">Delete</button></div><span>{{ selected.length }} selected</span></div>

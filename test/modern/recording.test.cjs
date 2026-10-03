@@ -56,7 +56,7 @@ async function fixture(t, exitCode, audioCd, cdMetadata) {
     duration: 30, size: stat.size, mtimeMs: stat.mtimeMs });
   const request = () => ({ mode: 'SP', revision: service.disc?.revision,
     tracks: [...service.files.values()].map(({ id, title }) => ({ id, title })) });
-  return { service, state, request };
+  return { service, state, request, disc };
 }
 
 test('local-file album tags are recognized regardless of tag capitalization', async t => {
@@ -112,6 +112,36 @@ test('CD lookup titles the selected track numbers and preserves the MiniDisc if 
   assert.equal(service.disc, before);
   await assert.rejects(service.addCd({ device: '/dev/sr0', revision: 'cd-one', tracks: [2], releaseId: 'invented' }), /album choice/);
   assert.equal(service.disc, before);
+});
+
+test('recording to a grouped disc appends the tracks and leaves the groups alone', async t => {
+  const { service, state, request, disc } = await fixture(t, 0);
+  disc.groupCount = 3;
+  disc.tracks.push({ no: 0, name: 'Grouped song', time: '00:30:00', bitrate: 'SP', protect: 'UNPROTECTED' });
+  await service.connect();
+  let detail;
+  const result = await service.upload(request(), async (_message, text) => { detail = text; return true; });
+  assert.match(detail, /outside the disc's groups/);
+  assert.equal(result.completed.length, 2);
+  assert.deepEqual(service.disc.tracks.map(t => t.name), ['Grouped song', 'first', 'second']);
+  assert.equal(service.disc.groupCount, 3);
+  assert.equal(state.calls.some(c => c[1] === 'settitle'), false);
+});
+
+test('a disc title or group change after recording stops the queue', async t => {
+  const { service, state, request, disc } = await fixture(t, 0);
+  disc.groupCount = 2;
+  await service.connect();
+  const run = service.run;
+  service.run = async (name, args, options) => {
+    const result = await run(name, args, options);
+    if (args[1] === 'send') disc.groupCount = 1;
+    return result;
+  };
+  await assert.rejects(service.upload(request(), async () => true), /groups changed unexpectedly/);
+  assert.equal(state.sends, 1);
+  assert.equal(service.files.has('first'), false);
+  assert.equal(service.files.has('second'), true);
 });
 
 test('automatic album title is confirmed and written only after all tracks commit', async t => {

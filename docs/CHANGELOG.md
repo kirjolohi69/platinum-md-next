@@ -2,6 +2,12 @@
 
 Newest first. Alpha versions were private test builds numbered 2.0.0-alpha.N; the first public numbering is 1.0.
 
+## 1.2.0
+
+- **Record onto discs with groups.** New tracks are added after the last track, outside the existing groups, just as when recording on the recorder itself. After each track the app checks that the disc title and groups are unchanged, and stops the queue if they are not.
+- Moving, deleting and renaming the disc remain unavailable on grouped discs for now, to protect their group information.
+- Releases no longer include the old NetMD connection-test download.
+
 ## 1.1.0
 
 - **Drag and drop:** drop audio files onto the recording queue instead of using **+ Add audio**. Dropping a folder explains that only files can be added.

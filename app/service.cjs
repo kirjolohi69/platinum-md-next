@@ -298,10 +298,9 @@ class NetMdService {
       const needed = selected.reduce((sum, t) => sum + t.duration / factor + 2, 0);
       if (needed > capacitySeconds(disc.availableTime)) throw new Error('The selected audio will not fit. Remove tracks or choose a longer recording mode.');
       if (selected.length + disc.tracks.length > 255) throw new Error('A MiniDisc can contain at most 255 tracks.');
-      if (disc.groupCount > 1) throw new Error('Recording to grouped discs is not supported in this version.');
       if (discTitle && disc.tracks.length) throw new Error('Automatic album naming is only available when the MiniDisc is empty.');
       if (!await confirm(`Record ${selected.length} track(s) in ${request.mode}?`,
-        `New tracks will be appended. Keep the recorder connected until the transfer finishes.${discTitle ? `\nMiniDisc title after recording: ${discTitle}` : ''}`)) return { completed: [], cancelled: true };
+        `New tracks will be appended${disc.groupCount > 1 ? ' after the last track, outside the disc\'s groups' : ''}. Keep the recorder connected until the transfer finishes.${discTitle ? `\nMiniDisc title after recording: ${discTitle}` : ''}`)) return { completed: [], cancelled: true };
       disc = await this.assertUnchanged(disc.revision);
       const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'platinum-md-next-'));
       const completed = [];
@@ -383,6 +382,12 @@ class NetMdService {
             const result = await this.readDisc();
             if (result.tracks.length !== count + 1 || result.tracks.at(-1).name !== track.title) {
               throw new Error('The last recording could not be verified. The queue has stopped. Refresh the disc before retrying.');
+            }
+            // Group information lives in the disc title. Recording only writes the
+            // new track's title, so any change here means something unexpected happened.
+            if (result.title !== disc.title || result.groupCount !== disc.groupCount) {
+              this.log('recording-disc-title-changed', { before: disc.groupCount, after: result.groupCount });
+              throw new Error('The track was recorded, but the disc title or groups changed unexpectedly. The queue has stopped. Check the disc on the recorder before recording more.');
             }
             return result;
           });
