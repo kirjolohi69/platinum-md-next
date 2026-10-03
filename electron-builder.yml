@@ -1,6 +1,5 @@
 appId: org.platinummd.Next
 productName: Platinum-MD Next
-electronVersion: 44.3.0
 asar: true
 npmRebuild: false
 directories:

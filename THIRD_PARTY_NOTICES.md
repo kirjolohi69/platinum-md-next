@@ -6,7 +6,7 @@ The desktop package includes separately licensed programs. The MIT application l
 
 | Component | Source / version | License |
 | --- | --- | --- |
-| Electron / Chromium / Node.js | Electron 44.3.0, https://github.com/electron/electron | MIT and component licenses; see the packaged `LICENSE.electron.txt` and `LICENSES.chromium.html` |
+| Electron / Chromium / Node.js | Electron (version in `package.json`), https://github.com/electron/electron | MIT and component licenses; see the packaged `LICENSE.electron.txt` and `LICENSES.chromium.html` |
 | Vue | 3.5.42, https://github.com/vuejs/core | MIT; copyright Evan You and Vue contributors |
 | electron-builder installer templates | 26.15.3, https://github.com/electron-userland/electron-builder | MIT; copyright Vladimir Krivosheev and contributors |
 | netmdcli and libnetmd | https://github.com/gavinbenda/linux-minidisc, pinned in `sources.json`, with our diagnostic patch | GPL-2.0-or-later and LGPL-2.1-or-later components; distributed helper is GPL-2.0-or-later |
