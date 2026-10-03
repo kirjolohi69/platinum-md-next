@@ -26,6 +26,8 @@ case "$ID ${ID_LIKE:-}" in
     dnf install -y -q /pkg/app.rpm
     remove() { dnf remove -y -q platinum-md-next; } ;;
   *suse*)
+    # openSUSE's download network sometimes refuses a metadata file; try again.
+    for attempt in 1 2 3; do zypper --non-interactive --quiet refresh && break; sleep 20; done
     zypper --non-interactive --quiet install --allow-unsigned-rpm /pkg/app.rpm
     remove() { zypper --non-interactive --quiet remove platinum-md-next; } ;;
   *arch*)
