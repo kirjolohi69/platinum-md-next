@@ -11,6 +11,12 @@ const { AudioCd, validateReadSpeed } = require('./audio-cd.cjs');
 const { CdMetadata, recorderTitle } = require('./cd-metadata.cjs');
 const { helperOutputLogger } = require('./helper-output.cjs');
 
+// Tag values such as "3" or "3/12"; anything else is treated as missing.
+function tagNumber(value) {
+  const match = typeof value === 'string' && value.trim().match(/^(\d{1,3})(?:\s*\/\s*\d{1,3})?$/);
+  return match && Number(match[1]) > 0 ? Number(match[1]) : undefined;
+}
+
 class NetMdService {
   constructor(paths, emit = () => {}, dependencies = {}) {
     this.paths = paths;
@@ -176,7 +182,7 @@ class NetMdService {
           const stat = await fs.stat(file);
           if (!stat.isFile()) continue;
           const result = await this.tool('ffprobe', ['-v', 'error', '-show_entries',
-            'format=duration:format_tags=title,artist,album,album_artist,track:stream=codec_type,duration', '-of', 'json', file], 15000);
+            'format=duration:format_tags=title,artist,album,album_artist,track,disc:stream=codec_type,duration', '-of', 'json', file], 15000);
           const meta = JSON.parse(result.stdout);
           if (!meta.streams?.some(s => s.codec_type === 'audio')) throw new Error('No audio stream.');
           const duration = Number(meta.format?.duration);
@@ -192,12 +198,18 @@ class NetMdService {
             albumKey: album ? JSON.stringify([album, albumArtist]) : '',
             duration, size: stat.size, mtimeMs: stat.mtimeMs };
           this.files.set(id, { ...item, path: file });
-          imported.push(item);
+          imported.push({ ...item, order: [tagNumber(tags.disc) ?? 1, tagNumber(tags.track)] });
         } catch (error) {
           errors.push(`${path.basename(file)}: ${error.message}`);
         }
       }
-      return { files: imported, errors };
+      // One album with numbered tracks is queued in album order; anything else
+      // keeps the order the files were chosen in.
+      if (imported.length > 1 && imported[0].albumKey && imported.every(f =>
+          f.albumKey === imported[0].albumKey && f.order[1] !== undefined)) {
+        imported.sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1]);
+      }
+      return { files: imported.map(({ order, ...item }) => item), errors };
     });
   }
 

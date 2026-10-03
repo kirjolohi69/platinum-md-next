@@ -67,6 +67,31 @@ test('local-file album tags are recognized regardless of tag capitalization', as
     ['Beyonce - Live', 'Performer', 'Album', 'Album artist - Album']);
 });
 
+test('files from one album are queued in disc and track order; other selections keep their order', async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'netmd-import-order-'));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const tags = {
+    'a.flac': { title: 'Disc 2 opener', album: 'Album', track: '1/9', disc: '2/2' },
+    'b.flac': { title: 'Third', album: 'Album', track: '3/9' },
+    'c.flac': { title: 'First', album: 'Album', track: '01' },
+    'd.flac': { title: 'Other album', album: 'Other', track: '2' }
+  };
+  const files = {};
+  for (const name of Object.keys(tags)) {
+    files[name] = path.join(dir, name);
+    await fs.writeFile(files[name], 'synthetic');
+  }
+  const service = new NetMdService({ bin: n => n, env: {} }, () => {}, {
+    run: async (_name, args) => ({ exitCode: 0, stdout: JSON.stringify({ format: { duration: '30',
+      tags: tags[path.basename(args.at(-1))] }, streams: [{ codec_type: 'audio' }] }) })
+  });
+  const album = await service.importFiles([files['a.flac'], files['b.flac'], files['c.flac']]);
+  assert.deepEqual(album.files.map(f => f.title), ['First', 'Third', 'Disc 2 opener']);
+  assert.ok(album.files.every(f => !('order' in f)));
+  const mixed = await service.importFiles([files['b.flac'], files['d.flac'], files['c.flac']]);
+  assert.deepEqual(mixed.files.map(f => f.title), ['Third', 'Other album', 'First']);
+});
+
 test('CD lookup titles the selected track numbers and preserves the MiniDisc if lookup is unavailable', async t => {
   const album = { id: 'release:1', album: 'Example album', artist: 'Album artist', tracks:
     [1, 2, 3].map(number => ({ number, title: `Song ${number}`, artist: `Artist ${number}` })) };

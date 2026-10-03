@@ -44,7 +44,7 @@ jobs:
           PLATINUM_SMOKE_TEST: '1'
         run: |
           timeout 45s xvfb-run -a /usr/bin/platinum-md-next | tee desktop-smoke.log
-          rg -q 'Desktop smoke test passed' desktop-smoke.log
+          grep -q 'Desktop smoke test passed' desktop-smoke.log
       - name: Source archive and checksums
         run: |
           git archive --format=tar.gz --prefix=platinum-md-next/ HEAD > release/Platinum-MD-Next-source.tar.gz
