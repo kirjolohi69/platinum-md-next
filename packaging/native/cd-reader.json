@@ -1,0 +1,23 @@
+{
+  "version": "3.10.2+debian-14build3",
+  "sourceDirectory": "cdparanoia-3.10.2+debian",
+  "original": "cdparanoia_3.10.2+debian.orig.tar.gz",
+  "debian": "cdparanoia_3.10.2+debian-14build3.debian.tar.xz",
+  "files": [
+    {
+      "filename": "cdparanoia_3.10.2+debian.orig.tar.gz",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/c/cdparanoia/cdparanoia_3.10.2+debian.orig.tar.gz",
+      "sha256": "402f8b8b4370dbdc276dfd624f768956d212893542a91ecbaa6b4206b2afef03"
+    },
+    {
+      "filename": "cdparanoia_3.10.2+debian-14build3.debian.tar.xz",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/c/cdparanoia/cdparanoia_3.10.2+debian-14build3.debian.tar.xz",
+      "sha256": "c3bbef781e1cfa0c4c1a7042390aa0f66da4d27f9c7dc5e2414a32c74cee3d4f"
+    },
+    {
+      "filename": "cdparanoia_3.10.2+debian-14build3.dsc",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/c/cdparanoia/cdparanoia_3.10.2+debian-14build3.dsc",
+      "sha256": "1c005bd38d4442dcbcb446daa63d8a22d628b6efdf07325aad878d998d9cdd2a"
+    }
+  ]
+}

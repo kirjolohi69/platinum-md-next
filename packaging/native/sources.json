@@ -1,0 +1,27 @@
+{
+  "linux-minidisc": {
+    "repository": "https://github.com/gavinbenda/linux-minidisc.git",
+    "commit": "f388b0cb8bae4db678ef5f642788775a9ab918c3",
+    "license": "GPL-2.0-or-later (mixed component licenses; see source)",
+    "patch": "packaging/native/netmd-diagnostics.patch"
+  },
+  "atracdenc": {
+    "repository": "https://github.com/dcherednik/atracdenc.git",
+    "commit": "cb170709f836cb43dc0312455188c791159d81dc",
+    "license": "LGPL-2.1; see source for individual components",
+    "submodules": {
+      "src/lib/libgha": "00a95243254cfb1e43b05888ebc68e9aa401507a"
+    }
+  },
+  "libsndfile": {
+    "repository": "https://github.com/libsndfile/libsndfile.git",
+    "commit": "72f6af15e8f85157bd622ed45b979025828b7001",
+    "license": "LGPL-2.1-or-later"
+  },
+  "ffmpeg": {
+    "repository": "https://github.com/FFmpeg/FFmpeg.git",
+    "commit": "38b88335f99e76ed89ff3c93f877fdefce736c13",
+    "version": "8.1.2",
+    "license": "LGPL-2.1-or-later (configured without GPL/nonfree features)"
+  }
+}
