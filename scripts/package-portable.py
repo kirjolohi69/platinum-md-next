@@ -61,9 +61,8 @@ check('app'); check('dist/ui');
                     ('LICENSE', ROOT / 'LICENSE', False),
                     ('THIRD_PARTY_NOTICES.md', ROOT / 'THIRD_PARTY_NOTICES.md', False),
                     ('source/Platinum-MD-Next.bundle', bundle, False)]
-        alpha = re.search(r'-alpha\.(\d+)$', version)
-        notes = ROOT / 'docs' / f'ALPHA_{alpha[1]}.md' if alpha else ROOT / 'docs/RELEASE_1_0.md'
-        if notes and notes.is_file():
+        notes = ROOT / json.loads((ROOT / 'package.json').read_text())['releaseNotes']
+        if notes.is_file():
             packaged_notes = temporary / 'RELEASE-NOTES.md'
             packaged_notes.write_text(notes.read_text().replace('(PORTABLE.md)', '(START-HERE.md)'))
             entries.append(('RELEASE-NOTES.md', packaged_notes, False))

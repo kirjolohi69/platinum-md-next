@@ -12,16 +12,17 @@ if not re.fullmatch(r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?', args.owner
     parser.error('Enter a GitHub username, not a URL.')
 root = Path(__file__).resolve().parent.parent
 url = f'https://github.com/{args.owner}/platinum-md-next'
+readme = root / 'README.md'
+text = readme.read_text()
+start, end = '<!-- download-start -->', '<!-- download-end -->'
+if not text.count(start) == text.count(end) == 1:
+    parser.error('README download markers are missing; nothing was changed.')
+text = text[:text.index(start) + len(start)] + f'\n\n[Download the .deb installer]({url}/releases/latest).\n\n' + text[text.index(end):]
 file = root / 'package.json'
 metadata = json.loads(file.read_text())
 metadata.update(homepage=url, repository={'type': 'git', 'url': f'git+{url}.git'},
                 bugs={'url': url + '/issues'}, musicbrainzContact=url)
 file.write_text(json.dumps(metadata, indent=2) + '\n')
-readme = root / 'README.md'
-text = readme.read_text()
-start, end = '<!-- download-start -->', '<!-- download-end -->'
-assert text.count(start) == text.count(end) == 1, 'README download markers are missing.'
-text = text[:text.index(start) + len(start)] + f'\n\n[Download the .deb installer]({url}/releases/latest).\n\n' + text[text.index(end):]
 readme.write_text(text)
 print(f'Updated project links and MusicBrainz contact to {url}.')
 print('Review git diff, commit, then build the release from that commit.')

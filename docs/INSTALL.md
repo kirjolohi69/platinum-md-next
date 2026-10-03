@@ -1,6 +1,6 @@
-# Install Platinum-MD Next 1.0.1
+# Install Platinum-MD Next 1.1.0
 
-The main download is **Platinum-MD-Next-1.0.1-linux-amd64.deb**. It contains the application, desktop runtime, NetMD helper, audio converters, CD reader, source and licenses. No previous app folder is needed.
+The main download is **Platinum-MD-Next-1.1.0-linux-amd64.deb**. It contains the application, desktop runtime, NetMD helper, audio converters, CD reader, source and licenses. No previous app folder is needed.
 
 ## Supported target
 
@@ -18,7 +18,7 @@ The `.deb` extension does not mean every Debian-based distribution is supported.
 If double-click installation does not work, right-click the folder containing the download and choose **Open in Terminal**. Run:
 
 ```bash
-sudo apt install ./Platinum-MD-Next-1.0.1-linux-amd64.deb
+sudo apt install ./Platinum-MD-Next-1.1.0-linux-amd64.deb
 ```
 
 Use `apt install`, not archive extraction. It installs the desktop dependencies and registers the application. Start the app as your normal user, without `sudo` or sandbox-disabling options. Internet access may be needed for desktop dependencies from your distribution.
@@ -37,9 +37,9 @@ The app reads, encodes and transfers each track in sequence. Its status line sho
 
 ## Update or remove
 
-Version 1.0.1 corrects the owner-only application-folder permission in 1.0.0 and uses the Walkman-orange disc icon for the launcher and window. Install this full package over 1.0.0. It replaces the app and refreshes the menu entry; no preliminary uninstall is needed. If the desktop temporarily shows its cached old icon, sign out and back in after saving your work.
+Install 1.1.0 directly over any earlier 1.0 or alpha package. It replaces the app and refreshes the menu entry; no preliminary uninstall is needed. Saved appearance, CD speed and album information are kept. If the desktop temporarily shows a cached old icon, sign out and back in after saving your work.
 
-Install a later `.deb` the same way. It replaces the installed app; no folder merging is required. Package-manager version `1:1.0.1` may be displayed: the leading `1:` ensures the 1.0 release sorts newer than the old 2.0 alpha packages. The app itself displays 1.0.1.
+Install a later `.deb` the same way. It replaces the installed app; no folder merging is required. Package-manager version `1:1.1.0` may be displayed: the leading `1:` ensures the 1.0 release sorts newer than the old 2.0 alpha packages. The app itself displays 1.1.0.
 
 To remove the installed application:
 
@@ -53,4 +53,4 @@ Your personal settings are left in your home directory. The application and its 
 
 Use **Diagnostics → Save report** when reporting a problem. Reports may contain music titles and paths; review them before posting publicly.
 
-The installed publishing guide is `/usr/share/doc/platinum-md-next/PUBLISHING.md`. The complete application Git history is `/usr/share/doc/platinum-md-next/source/Platinum-MD-Next.bundle`. Native corresponding source and licenses are included under `/opt/Platinum-MD Next/resources/native/`.
+The installed changelog is `/usr/share/doc/platinum-md-next/CHANGELOG.md`. The complete application Git history is `/usr/share/doc/platinum-md-next/source/Platinum-MD-Next.bundle`. Native corresponding source and licenses are included under `/opt/Platinum-MD Next/resources/native/`.

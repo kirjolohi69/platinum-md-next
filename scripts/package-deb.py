@@ -86,8 +86,8 @@ Categories=AudioVideo;Audio;
     shutil.copyfile(root / 'packaging/linux/70-platinum-md-netmd.rules', rules)
     docs = stage / 'usr/share/doc' / executable
     (docs / 'source').mkdir(parents=True)
-    for original, name in [('docs/INSTALL.md', 'INSTALL.md'), (metadata.get('releaseNotes', 'docs/RELEASE_1_0.md'), 'RELEASE-NOTES.md'),
-                           ('docs/PUBLISHING.md', 'PUBLISHING.md'), ('docs/VALIDATION.md', 'VALIDATION.md'),
+    for original, name in [('docs/INSTALL.md', 'INSTALL.md'), (metadata['releaseNotes'], 'RELEASE-NOTES.md'),
+                           ('docs/CHANGELOG.md', 'CHANGELOG.md'), ('docs/VALIDATION.md', 'VALIDATION.md'),
                            ('LICENSE', 'copyright'), ('THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md')]:
         shutil.copyfile(root / original, docs / name)
     bundle = docs / 'source/Platinum-MD-Next.bundle'

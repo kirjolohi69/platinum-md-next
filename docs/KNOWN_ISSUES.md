@@ -36,7 +36,7 @@ The new report contains 755 events and 59 helper invocations, all successful. A 
 
 ## Remaining checks
 
-Use [the alpha.7 guide](ALPHA_7.md) to check MusicBrainz lookup. Then confirm the optional empty-disc album title and one short LP2 recording and one LP4 recording with listening. Save diagnostics. Clean-system installation, broader Linux support, other recorders and stable-release recovery checks remain pending.
+MusicBrainz lookup has since been confirmed working. Then confirm the optional empty-disc album title and one short LP2 recording and one LP4 recording with listening. Save diagnostics. Clean-system installation, broader Linux support, other recorders and stable-release recovery checks remain pending.
 
 CD extraction retains cdparanoia correction and abort-on-skip, CD-table rechecks and PCM format/length validation. There is no AccurateRip/bit-perfect certification; discs with identical tables cannot be distinguished by this fingerprint alone. Pre-emphasis and four-channel tracks remain unavailable. MusicBrainz lookup may find several editions, possible matches or no result. Noncontiguous audio-track layouts use manual titles. Online lookup does not identify arbitrary local files.
 
@@ -46,4 +46,4 @@ Alpha.6 keeps the alpha.4 native helper and USB/sandbox policies. Each revision 
 
 The September 23 report shows successful recorder reads and a successful CD table query, followed by two MusicBrainz HTTP 400 responses. Alpha.5 encoded the `inc` separators as literal `%2B` characters. Alpha.6 supplies spaces to the URL encoder, producing the documented `+` query separators, and uses the documented `recordings`, `artist-credits` and `discids` include options. Rejected requests now have a specific message and bounded service details in Diagnostics. Contract regression tests pass; successful live matching still needs checking on the user's computer because the API is unavailable from the build environment.
 
-The next alpha.6 report exposed a second problem: `discids` is rejected by this particular endpoint. Alpha.7 removes it. The server adds disc IDs automatically, so exact matching is retained. The corrected endpoint-specific regression reproduces the report's exact HTTP 400 detail; the older generic-release contract was incomplete. See `CD_METADATA.md` for the checked upstream source and `ALPHA_7.md` for the next lookup check.
+The next alpha.6 report exposed a second problem: `discids` is rejected by this particular endpoint. Alpha.7 removes it. The server adds disc IDs automatically, so exact matching is retained. The corrected endpoint-specific regression reproduces the report's exact HTTP 400 detail; the older generic-release contract was incomplete. See `CD_METADATA.md` for the checked upstream source.

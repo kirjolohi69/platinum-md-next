@@ -29,7 +29,7 @@ This run should begin with `Platinum-MD Next connection test 2.0.0-alpha.2`. Its
 
 ## 2. Try the desktop alpha (after connection is confirmed)
 
-The alpha.2 connection test has now successfully read 22 LP2 tracks on an MZ-N910. The Debian desktop package has been rebuilt with that same helper. For the split downloads supplied in this conversation, follow [the desktop-test guide](DESKTOP_TEST.md): extract the first ZIP, keep the remaining ZIP files beside it, and run `bash ./Start-Platinum-MD.sh` from the extracted folder. It checks the downloads and tries a normal-user launch without installing system files.
+The alpha.2 connection test has now successfully read 22 LP2 tracks on an MZ-N910. The Debian desktop package has been rebuilt with that same helper.
 
 On Mint 22, download the `.deb` and double-click it to open the package installer. An administrator must approve installation. Launch **Platinum-MD Next** from the sound/video menu as your normal user. The installer includes the USB rule; reconnect the recorder after installation.
 
@@ -39,7 +39,7 @@ Portable launch still requires compatible desktop libraries and sandbox support;
 
 First check that the track list matches the recorder, then try Play, Pause and Stop while listening through the recorder's output. The successfully tested disc is full and grouped. Keep it for read/playback checks; do not erase it to make space.
 
-Desktop launch, selected-track playback, Stop and idle USB reconnection are now confirmed on the user's MZ-N910 setup. Follow [the first-recording guide](FIRST_RECORDING.md) next: use a spare blank disc, add the provided 30-second test WAV, select **SP**, and record one track. Listen on the recorder and check duration, title and channels. Only then try LP2/LP4 or editing operations on the spare disc. **Stop after this track** lets the active transfer finish before stopping the queue.
+Desktop launch, selected-track playback, Stop and idle USB reconnection are now confirmed on the user's MZ-N910 setup. For a first recording, use a spare blank disc, add the provided 30-second test WAV, select **SP**, and record one track. Listen on the recorder and check duration, title and channels. Only then try LP2/LP4 or editing operations on the spare disc. **Stop after this track** lets the active transfer finish before stopping the queue.
 
 If something fails, stop and save the report from **Diagnostics**. Do not keep retrying a write whose result is uncertain. Reports identify failures but do not prove that an interrupted write left the disc unchanged.
 

@@ -66,7 +66,7 @@ For every run, record the package checksum, distribution/version, desktop/sessio
 
 The first MZ-N910 report confirmed opening and claiming the USB interface and reaching the capacity request. A regression test reproduces alpha.1 rejecting a valid synthetic 46-byte capacity reply. The corrected C reader passes eight protocol cases, and all 15 service tests pass.
 
-The follow-up probe report confirms the actual 46-byte reply and a complete listing of 22 LP2 tracks. Its helper SHA-256 matches the binary in the alpha.2 desktop package. The report specifies x86_64, glibc 2.39 and kernel 7.0.0-31-generic; Linux Mint 22.3 was identified by the user. Later desktop and first SP recording confirmation are recorded below. No private track titles were copied into the repository. See `ALPHA_2.md`.
+The follow-up probe report confirms the actual 46-byte reply and a complete listing of 22 LP2 tracks. Its helper SHA-256 matches the binary in the alpha.2 desktop package. The report specifies x86_64, glibc 2.39 and kernel 7.0.0-31-generic; Linux Mint 22.3 was identified by the user. Later desktop and first SP recording confirmation are recorded below. No private track titles were copied into the repository. See the alpha.2 entry in `CHANGELOG.md`.
 
 The rebuilt `Platinum-MD-Next-2.0.0-alpha.2-linux-amd64.deb` has SHA-256 `addba08350d36300767df4960795b9e356c51e36859188c8b517f9c41eeb6993`. Its packaged application version and full-disc notice were inspected. Split-download reconstruction and extraction passed locally. The user has since confirmed the desktop window and recorder discovery on Mint; system package installation remains unverified.
 

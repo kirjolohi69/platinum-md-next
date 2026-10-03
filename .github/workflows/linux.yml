@@ -2,7 +2,11 @@ name: Linux Debian build
 
 on:
   push:
+    # Tags are built through the release event below, not twice.
+    branches: ['**']
   pull_request:
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -58,3 +62,30 @@ jobs:
             release/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
+
+  # Publishing a release on GitHub builds that tag and attaches the installer.
+  attach-release:
+    if: github.event_name == 'release'
+    needs: linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Attach installer to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh run download "$GITHUB_RUN_ID" --name linux-amd64 --dir release
+          deb="release/Platinum-MD-Next-${TAG#v}-linux-amd64.deb"
+          if [ ! -f "$deb" ]; then
+            echo "::error::The release tag $TAG does not match the app version in package.json. Expected $deb."
+            ls release
+            exit 1
+          fi
+          cd release && sha256sum --check --ignore-missing SHA256SUMS
+          sha256sum ./*.deb ./*.tar.gz | sed 's# \./# #' > SHA256SUMS
+          gh release upload "$TAG" ./*.deb ./*.tar.gz SHA256SUMS --clobber
