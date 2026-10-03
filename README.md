@@ -1,4 +1,4 @@
-**Platinum-MD Next’s modernization is 100% vibe-coded, first with ChatGPT (GPT-6 Astra) and now with Claude (Anthropic).**
+**⚠️ Note that Platinum-MD Next is 100% vibe-coded, first with ChatGPT and now with Claude ⚠️**
 
 # Platinum-MD Next
 
