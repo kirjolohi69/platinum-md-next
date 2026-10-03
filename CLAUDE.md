@@ -31,7 +31,7 @@ Decisions already made (do not reopen without the owner asking):
 ## Safety rules (the app must never damage a user's MiniDisc)
 
 - Never retry a write automatically. Verify every write by reading the disc back; on any mismatch, stop and explain.
-- Group information lives inside the raw disc title (`0;Title//1-3;Group//`). `netmdcli settitle` overwrites the whole title. Recording to grouped discs is allowed (since 1.2.0: `send` only writes the new track's title, and the app checks that the disc title and group count are unchanged afterwards). **Moving, deleting and disc renaming stay blocked on grouped discs** until group-preserving rewrites are implemented and hardware-tested.
+- Group information lives inside the raw disc title (`0;Title//1-3;Group//`). `netmdcli settitle` overwrites the whole title. Since 1.2.0 the patched `netmdcli` reports it as `rawTitle`, and `app/groups.cjs` parses/rewrites it. Track commands (`send`, `move`, `delete`, `rename`) never touch it, so after a move/delete the app checks `rawTitle` is unchanged, writes the adjusted line with `settitle` (max 255 bytes), and reads it back. Discs whose line is not printable ASCII or not fully understood stay read-only for move/delete/disc rename (`groupsEditable: false`).
 - Changes to recording, disc editing, USB or the native patch need the owner's spare-disc hardware test before a release.
 
 ## Workflow
@@ -49,7 +49,7 @@ Ask the owner first for: anything that changes recording, disc editing, USB acce
 
 ## Open work
 
-- Grouped discs, step 2: rename/delete/move with group information preserved (may need netmdcli raw-title support); step 3: create/edit groups. Needs hardware testing.
+- Grouped discs: rename/delete/move is implemented in 1.2.0 and awaits the owner's hardware test. Next step: creating and editing groups in the app.
 - "Does my recorder work?" issue form and a compatibility table.
 - `.rpm` and AUR packaging.
 - README screenshot: the owner will upload `docs/screenshot.png`, then add it under the title.

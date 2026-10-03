@@ -31,7 +31,7 @@ Tested with a Sony MZ-N910 on Linux Mint 22.3. Other NetMD recorders are unteste
 ## Good to know
 
 - After recording, keep the recorder powered while it saves the disc's track list. If the lid of an MZ-N910 (or similar recorder's lid) stays locked, press its **STOP** button and wait for "TOC Edit" to disappear.
-- On discs with groups, new recordings are added after the last track, outside the groups. Moving, deleting and renaming the disc are unavailable on these discs for now, to protect their group information.
+- Discs with groups are supported: groups are shown in the track list and kept up to date when you delete or move tracks or rename the disc. New recordings are added after the last track, outside the groups. Creating and editing groups is done on the recorder.
 - Track titles are limited to basic Latin characters; accents are simplified.
 - Not supported: Hi-MD (maybe in the future), copying audio from a MiniDisc back to the computer, Windows and macOS.
 - Album lookup is optional. It sends only the CD's track timings to MusicBrainz, never your audio. See [CD metadata](docs/CD_METADATA.md).

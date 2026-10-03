@@ -236,6 +236,9 @@ button.primary:hover:not(:disabled){background:var(--primary-hover);color:var(--
 .disc-track-title{overflow-wrap:anywhere}
 .mode-badge{font-size:9px;color:var(--lcd-text);background:var(--lcd);padding:3px 5px;border-radius:4px}
 .selected{background:var(--tint)}
+.disc-tracks .group-row td{padding:10px 8px 6px;border-top:1px solid var(--line);background:var(--subtle);color:var(--accent);font-weight:700;font-size:11px;letter-spacing:.3px}
+.disc-tracks .group-row small{margin-left:8px;color:var(--muted);font-weight:500}
+.disc-tracks tr.in-group .disc-track-title{box-shadow:inset 3px 0 var(--metal);padding-left:12px}
 .group-notice{font-size:11px;padding:12px 22px;background:var(--notice-bg);color:var(--notice-text)}
 .modal-backdrop{position:fixed;inset:0;background:var(--overlay);display:flex;align-items:center;justify-content:center;z-index:10;padding:32px}
 .dialog{background:var(--surface);border-radius:12px;padding:26px;width:480px;max-height:90vh;overflow:auto;box-shadow:0 20px 80px var(--shadow)}
