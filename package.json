@@ -32,7 +32,7 @@
     "@vitejs/plugin-vue": "6.0.10",
     "electron": "44.7.2",
     "electron-builder": "26.15.3",
-    "vite": "8.3.4",
+    "vite": "8.3.5",
     "vue": "3.5.44"
   },
   "homepage": "https://github.com/kirjolohi69/platinum-md-next",
